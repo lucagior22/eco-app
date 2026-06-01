@@ -1,0 +1,411 @@
+# SPECIFICATION.md — eco-app
+
+> Fuente de verdad para el agente. Ante cualquier ambigüedad, este archivo tiene prioridad.
+
+---
+
+## 1. Descripción general
+
+**Eco** es una PWA (Progressive Web App) de asistencia musical para músicos con discapacidad visual o ceguera.
+Permite afinar instrumentos, leer partituras, identificar pedales de efecto y configurar preferencias de accesibilidad — todo con narración por voz y navegación por teclado completa.
+
+**Plataforma primaria:** móvil (PWA instalable, mobile-first)
+**Plataforma secundaria:** desktop (mismo código, layout adaptado)
+**Idioma:** español (Argentina)
+**Deployment:** Docker en Ubuntu Server local, expuesto vía Cloudflare Tunnel
+
+---
+
+## 2. Stack técnico
+
+```
+Next.js 15 (App Router) + TypeScript strict
+├── @serwist/next          → service worker + PWA manifest
+├── react-aria-components  → componentes accesibles (Adobe)
+├── tailwindcss            → sistema de estilos
+├── pitchfinder            → algoritmo YIN para detección de pitch
+├── Web Speech API         → TTS nativo del browser (sin librería)
+├── Web Audio API          → captura de micrófono (AudioContext)
+└── MediaDevices API       → acceso a cámara (getUserMedia)
+
+Backend (mismo contenedor):
+└── /api/ocr/route.ts → child_process → oemer (Python 3)
+```
+
+---
+
+## 3. Estructura de archivos
+
+```
+eco-app/
+├── app/
+│   ├── layout.tsx                  # root layout: skip link, nav, PWA meta
+│   ├── page.tsx                    # redirect a /afinador
+│   ├── globals.css                 # CSS variables de tema + Tailwind base
+│   ├── manifest.ts                 # PWA manifest dinámico
+│   ├── afinador/
+│   │   └── page.tsx
+│   ├── partitura/
+│   │   ├── page.tsx
+│   │   └── metronomo/
+│   │       └── page.tsx
+│   ├── pedal/
+│   │   └── page.tsx
+│   ├── ajustes/
+│   │   └── page.tsx
+│   └── api/
+│       └── ocr/
+│           └── route.ts            # POST: recibe imagen → oemer → acordes
+├── components/
+│   ├── layout/
+│   │   ├── Navigation.tsx          # bottom bar móvil / sidebar desktop
+│   │   ├── PageHeader.tsx          # h1 + subtítulo de cada pantalla
+│   │   └── SkipLink.tsx            # "Ir al contenido principal"
+│   ├── tuner/
+│   │   ├── TunerDisplay.tsx        # notas E A D G B E con activa resaltada
+│   │   ├── PitchIndicator.tsx      # barra de centavos (aguja)
+│   │   └── TunerEngine.tsx         # lógica: AudioContext + pitchfinder
+│   ├── score/
+│   │   ├── ScoreUpload.tsx         # botones "Subir archivo" y "Tomar foto"
+│   │   ├── ScorePreview.tsx        # preview de la imagen cargada
+│   │   └── HarmonyList.tsx         # lista de acordes detectados
+│   ├── metronome/
+│   │   └── Metronome.tsx           # BPM display + controles +/-/play
+│   ├── pedal/
+│   │   ├── CameraView.tsx          # stream de cámara + overlay bounding box
+│   │   └── PedalInfo.tsx           # modelo, parámetros, estado LED
+│   └── settings/
+│       └── SettingCarousel.tsx     # control < valor > reutilizable
+├── contexts/
+│   └── SettingsContext.tsx         # tema, tamaño fuente, velocidad TTS
+├── lib/
+│   ├── pitch.ts                    # wrapper de pitchfinder + note detection
+│   ├── tts.ts                      # wrapper de Web Speech API
+│   ├── settings.ts                 # lectura/escritura localStorage
+│   └── metronome.ts                # AudioContext beep + Vibration API
+├── hooks/
+│   ├── useMicrophone.ts            # getUserMedia audio
+│   └── useCamera.ts                # getUserMedia video
+├── public/
+│   ├── icons/                      # íconos PWA (192x192, 512x512)
+│   └── sw.js                       # generado por Serwist en build
+├── Dockerfile
+├── docker-compose.yml
+├── .env.local.example
+├── CLAUDE.md
+└── SPECIFICATION.md
+```
+
+---
+
+## 4. Sistema de diseño
+
+### Colores (tokens CSS en `globals.css`)
+
+```css
+:root {
+  --color-bg: #f2f2f7; /* fondo general */
+  --color-surface: #ffffff; /* cards y superficies */
+  --color-text-primary: #000000;
+  --color-text-secondary: #6b7280;
+  --color-accent-green: #22c55e; /* afinado, éxito */
+  --color-accent-blue: #3b82f6; /* nav activo */
+  --color-accent-orange: #f97316; /* velocidad alta TTS */
+  --color-border: #e5e5ea;
+  --color-header-bg: #e5e5ea; /* fondo del header de cada pantalla */
+}
+
+[data-theme='dark'] {
+  /* pendiente v2 */
+}
+
+[data-theme='high-contrast'] {
+  --color-bg: #000000;
+  --color-surface: #1a1a1a;
+  --color-text-primary: #ffffff;
+  --color-accent-green: #00ff00;
+  --color-accent-blue: #00bfff;
+}
+```
+
+### Tipografía
+
+- Fuente: sistema (`-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`)
+- Tamaños base por setting de fuente:
+  - `sm`: 14px base
+  - `md`: 16px base (default)
+  - `lg`: 18px base
+  - `xl`: 20px base
+- Títulos de pantalla: bold, 28px (md), escala con setting
+- Subtítulos: regular, 14px, color secondary
+
+### Layout responsivo
+
+- **Mobile (< 768px):** bottom tab bar fija (altura 72px), contenido en columna
+- **Desktop (≥ 768px):** sidebar izquierda fija (ancho 80px), contenido en el resto
+
+---
+
+## 5. Navegación
+
+### Componente Navigation
+
+Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
+
+```
+Ícono    Etiqueta   Ruta
+📄       Partitura  /partitura
+🎛️       Pedal      /pedal
+🎵       Afinador   /afinador
+⚙️       Ajustes    /ajustes
+```
+
+- Ítem activo: subrayado azul (`--color-accent-blue`) debajo del ícono
+- `aria-current="page"` en el ítem activo
+- `aria-label="Navegación principal"` en el `<nav>`
+- Todos los ítems accesibles por teclado
+
+### Pantalla Metrónomo
+
+- Mobile: ruta separada `/partitura/metronomo`, botón back con flecha ←
+- Desktop: panel derecho inline dentro de `/partitura` (split 50/50)
+
+---
+
+## 6. Pantallas
+
+### 6.1 Afinador (`/afinador`)
+
+**Propósito:** detectar la nota tocada por el instrumento y narrar si está afinada, baja o alta.
+
+**Comportamiento:**
+
+1. Al entrar a la pantalla, pedir permiso de micrófono automáticamente
+2. Capturar audio continuo con `AudioContext` + `ScriptProcessorNode` o `AudioWorklet`
+3. Procesar con `pitchfinder` (algoritmo YIN, buffer 2048)
+4. Detectar la nota más cercana en escala cromática (A4 = 440 Hz)
+5. Calcular desviación en centavos
+6. Actualizar display y narrar via TTS:
+   - Si |centavos| < 10: "Re. Afinado." (narrar máximo cada 3 segundos)
+   - Si centavos > 10: "Re. Un poco alto."
+   - Si centavos < -10: "Re. Un poco bajo."
+7. En desktop: mostrar selector de micrófono (dropdown con `enumerateDevices`)
+
+**Elementos visuales:**
+
+- Notas de guitarra: E A D G B E en fila horizontal, nota activa en verde y bold
+- Estado textual: "Afinado!", "Un poco alto", "Un poco bajo"
+- Frecuencia en Hz debajo del estado
+- Barra de centavos: línea vertical central verde (afinado) o desplazada
+
+**Accesibilidad específica:**
+
+- `aria-live="polite"` en el display de nota y estado
+- El display de frecuencia tiene `aria-label="Frecuencia: 146.83 hertz"`
+- La barra de centavos tiene `aria-label="Desviación: 2 centavos alto"` (oculta visualmente si hay texto)
+- Botón de pausa/inicio del micrófono con `aria-pressed`
+
+---
+
+### 6.2 Leer partitura (`/partitura`)
+
+**Propósito:** leer una foto o archivo de partitura, detectar la armonía, y narrar los acordes.
+
+**Comportamiento:**
+
+1. Pantalla inicial: imagen de partitura (si hay una cargada) o placeholder
+2. Botones de acción:
+   - "Subir archivo": `<input type="file" accept="image/*,.pdf">`
+   - "Tomar foto": `getUserMedia` con `facingMode: environment`
+3. Al recibir imagen: POST a `/api/ocr` con la imagen como `FormData`
+4. Durante procesamiento: loading state con mensaje "Analizando partitura..." + `aria-busy`
+5. Al completar: mostrar lista de acordes detectados como texto
+6. Botón "Metrónomo": navega a `/partitura/metronomo` (mobile) o muestra panel (desktop)
+
+**Endpoint `/api/ocr`:**
+
+- Método: POST, multipart/form-data, campo `image`
+- Proceso: escribir imagen a `/tmp/score_[timestamp].[ext]`, ejecutar `python3 -m oemer [path]`, parsear output, limpiar tmp
+- Timeout: 60 segundos
+- Response exitosa: `{ chords: string[], rawText: string }`
+- Response error: `{ error: string }`
+
+**Accesibilidad específica:**
+
+- El estado de carga anuncia "Analizando partitura" via `aria-live="assertive"`
+- La lista de acordes es un `<ul>` semántico con `aria-label="Acordes detectados"`
+- Cada acorde es un `<li>` legible por screen reader
+- Botones de "Subir" y "Tomar foto" tienen labels descriptivos
+
+---
+
+### 6.3 Metrónomo (`/partitura/metronomo`)
+
+**Propósito:** metrónomo con BPM ajustable, audio y háptico.
+
+**Comportamiento:**
+
+- BPM inicial: 120. Rango: 40–220.
+- Botón `−`: decrementa 1 BPM. Hold: decrementa continuo cada 150ms
+- Botón `+`: incrementa 1 BPM. Hold: incrementa continuo cada 150ms
+- Botón Play/Stop: alterna estado
+  - Play: genera beep via `AudioContext.createOscillator()` + `navigator.vibrate(50)` en cada beat
+  - Stop: detiene beep y vibración
+- Display BPM: número grande, actualiza en tiempo real
+
+**Accesibilidad específica:**
+
+- Display BPM: `aria-live="polite"` solo cuando cambia por +/−
+- Botón Play: `aria-pressed="true/false"`, label "Iniciar metrónomo" / "Detener metrónomo"
+- Botones +/−: `aria-label="Incrementar BPM"` / `aria-label="Decrementar BPM"`
+
+---
+
+### 6.4 Detectar pedal (`/pedal`)
+
+**Propósito:** identificar un pedal de guitarra vía cámara y leer sus parámetros.
+
+**Comportamiento (v1 — detección mockeada):**
+
+1. Al entrar: pedir permiso de cámara, mostrar stream en tiempo real
+2. Botón "Detectar" (o detección automática cada 2s): tomar frame del stream
+3. Mostrar overlay de bounding box rojo sobre la imagen congelada
+4. Mostrar datos mockeados del pedal detectado:
+   - Nombre: "BOSS DS-1"
+   - Tone: 50%, Level: 50%, Dist: 50%
+   - Check LED: OFF (en rojo)
+5. Narrar via TTS: "Pedal BOSS DS-1 detectado. Tone al 50%. Level al 50%. Distorsión al 50%. LED apagado."
+
+**Nota de implementación:** los datos del pedal son fijos en v1. La UI debe estar construida para recibir datos dinámicos en v2.
+
+**Accesibilidad específica:**
+
+- El stream de cámara tiene `aria-label="Vista de cámara para detección de pedal"`
+- Los valores (Tone, Level, Dist) están en una `<dl>` semántica
+- El estado del LED tiene texto explícito además del color
+- Botón de detección: `aria-label="Detectar pedal con la cámara"`
+
+---
+
+### 6.5 Ajustes (`/ajustes`)
+
+**Propósito:** configurar preferencias de accesibilidad persistentes.
+
+**Tres configuraciones, cada una con control carrusel `< valor >`:**
+
+| Setting                | Opciones                                 | Default |
+| ---------------------- | ---------------------------------------- | ------- |
+| Color (tema)           | Claro → Oscuro → Alto contraste → Claro  | Claro   |
+| Tamaño de fuente       | Pequeño → Normal → Grande → Extra grande | Normal  |
+| Velocidad del narrador | Lenta → Normal → Alta → Muy alta         | Normal  |
+
+**Persistencia:**
+
+```typescript
+// localStorage key: "eco-settings"
+interface EcoSettings {
+  theme: 'light' | 'dark' | 'high-contrast'
+  fontSize: 'sm' | 'md' | 'lg' | 'xl'
+  ttsSpeed: 'slow' | 'normal' | 'fast' | 'very-fast' // mapea a 0.75, 1, 1.25, 1.5 en SpeechSynthesis.rate
+}
+```
+
+- Cambios se aplican inmediatamente (via SettingsContext + CSS variables en `<html>`)
+- Se leen en el layout raíz para evitar flash de contenido sin estilo
+
+**Accesibilidad específica del control carrusel:**
+
+- Rol: `group` con `aria-labelledby` apuntando al título
+- Botones `<` y `>`: `aria-label="Tema anterior"` / `aria-label="Siguiente tema"`
+- Valor actual: `aria-live="polite"` para anunciar el cambio
+- Teclado: flechas izquierda/derecha también cambian el valor
+
+---
+
+## 7. PWA
+
+```typescript
+// app/manifest.ts
+{
+  name: "Eco — Asistente musical accesible",
+  short_name: "Eco",
+  start_url: "/afinador",
+  display: "standalone",
+  background_color: "#F2F2F7",
+  theme_color: "#F2F2F7",
+  orientation: "portrait-primary",
+  icons: [
+    { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" }
+  ]
+}
+```
+
+Serwist: precachear páginas y assets estáticos. Audio y cámara no se cachean.
+
+---
+
+## 8. Docker
+
+> **Implementado:** Se cambió la imagen base de `node:20-alpine` a `node:20-bookworm-slim` (Debian). oemer depende de `onnxruntime-gpu`, cuyos wheels en PyPI son exclusivamente manylinux (glibc); en Alpine (musl libc) pip no puede instalarlos. Además, se instala `onnxruntime` (CPU-only) antes de `oemer` para evitar que pip instale la variante `-gpu`, que requeriría CUDA en runtime. Ver DECISIONS.md entradas "Imagen base Debian Bookworm" y "onnxruntime CPU-only".
+
+```dockerfile
+# Dockerfile
+FROM node:20-alpine
+
+# Python + oemer
+RUN apk add --no-cache python3 py3-pip gcc musl-dev libffi-dev
+RUN pip3 install oemer --break-system-packages
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --production=false
+COPY . .
+RUN npm run build
+
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+```yaml
+# docker-compose.yml
+services:
+  eco-app:
+    build: .
+    ports:
+      - '3000:3000'
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+```
+
+Cloudflare Tunnel apunta al puerto 3000.
+
+---
+
+## 9. Variables de entorno
+
+```bash
+# .env.local.example
+NEXT_PUBLIC_APP_URL=http://localhost:3000   # reemplazar con URL de Cloudflare Tunnel en producción
+```
+
+---
+
+## 10. Requisitos WCAG 2.2 para validación
+
+La app debe pasar:
+
+- **Lighthouse Accessibility:** ≥ 95
+- **WAVE (WebAIM):** cero errores, mínimo de alertas justificadas
+- **axe DevTools:** cero violaciones críticas o serias
+
+Validación manual requerida:
+
+- Navegación solo teclado (Tab completo por toda la app)
+- Con VoiceOver (iOS Safari) — pantalla Afinador y Ajustes
+- Con NVDA (Windows + Chrome) — pantalla Partitura
+- Con CSS deshabilitado — todas las pantallas
+- Con JS deshabilitado — todas las pantallas (SSR)
+- En viewport 375px (iPhone SE) y 390px (iPhone 14)
+- En viewport 1280px (desktop estándar)

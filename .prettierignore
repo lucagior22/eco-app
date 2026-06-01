@@ -1,0 +1,14 @@
+.next
+out
+build
+node_modules
+package-lock.json
+public/sw.js
+public/sw.js.map
+next-env.d.ts
+# Documentación de markdown: se excluye del formateo para preservar
+# tablas y bloques de código tal como fueron escritos.
+*.md
+Dockerfile
+docker-compose.yml
+.env.local.example
