@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { ThemeSetting } from '@/components/settings/ThemeSetting'
+import { FontSizeSetting } from '@/components/settings/FontSizeSetting'
 import { FontFamilySetting } from '@/components/settings/FontFamilySetting'
 export const metadata: Metadata = {
   title: 'Ajustes — Eco',
@@ -15,6 +16,7 @@ export default function AjustesPage() {
       />
       <div className="flex flex-col gap-4 p-4">
         <ThemeSetting />
+        <FontSizeSetting />
         <FontFamilySetting />
       </div>
     </>
