@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { ThemeSetting } from '@/components/settings/ThemeSetting'
 import { FontFamilySetting } from '@/components/settings/FontFamilySetting'
-
 export const metadata: Metadata = {
   title: 'Ajustes — Eco',
 }
