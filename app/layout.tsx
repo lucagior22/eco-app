@@ -1,8 +1,28 @@
 import type { Metadata, Viewport } from 'next'
+import { Atkinson_Hyperlegible, Inter, Lexend } from 'next/font/google'
 import './globals.css'
 import { SettingsProvider } from '@/contexts/SettingsContext'
 import { SkipLink } from '@/components/layout/SkipLink'
 import { Navigation } from '@/components/layout/Navigation'
+
+const atkinson = Atkinson_Hyperlegible({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-hyperlegible',
+  display: 'swap',
+})
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+})
+
+const lexend = Lexend({
+  subsets: ['latin'],
+  variable: '--font-lexend',
+  display: 'swap',
+})
 
 // Script anti-flash: lee las preferencias del localStorage ANTES del primer
 // render y aplica data-theme y data-font-size al <html>, evitando el flash
@@ -17,9 +37,10 @@ const ANTI_FLASH_SCRIPT = `
       var s = JSON.parse(raw);
       if (s.theme) document.documentElement.setAttribute('data-theme', s.theme);
       if (s.fontSize) document.documentElement.setAttribute('data-font-size', s.fontSize);
+      if (s.fontFamily) document.documentElement.setAttribute('data-font-family', s.fontFamily);
     }
   } catch (e) {
-    // JSON inválido o localStorage inaccesible: quedan los defaults (light/md)
+    // JSON inválido o localStorage inaccesible: quedan los defaults (light/md/hyperlegible)
   }
 })();
 `
@@ -37,9 +58,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // data-theme y data-font-size los aplica el script anti-flash en el cliente.
+    // data-theme, data-font-size y data-font-family los aplica el script anti-flash en el cliente.
     // En SSR quedan sin atributo → caen a los defaults de globals.css (:root).
-    <html lang="es">
+    // Las clases de fuentes hacen disponibles las CSS variables --font-* para globals.css.
+    <html lang="es" className={`${atkinson.variable} ${inter.variable} ${lexend.variable}`}>
       <head>
         {/* Script síncrono para evitar flash de tema/tamaño incorrecto.
             Debe estar en <head> antes de cualquier CSS que dependa de data-theme. */}

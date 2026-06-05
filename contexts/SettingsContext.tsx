@@ -8,6 +8,7 @@ interface SettingsContextValue {
   setTheme: (theme: EcoSettings['theme']) => void
   setFontSize: (fontSize: EcoSettings['fontSize']) => void
   setTtsSpeed: (ttsSpeed: EcoSettings['ttsSpeed']) => void
+  setFontFamily: (fontFamily: EcoSettings['fontFamily']) => void
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
@@ -26,6 +27,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     saveSettings(settings)
     document.documentElement.setAttribute('data-theme', settings.theme)
     document.documentElement.setAttribute('data-font-size', settings.fontSize)
+    document.documentElement.setAttribute('data-font-family', settings.fontFamily)
   }, [settings])
 
   function setTheme(theme: EcoSettings['theme']) {
@@ -40,8 +42,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setSettings((prev) => ({ ...prev, ttsSpeed }))
   }
 
+  function setFontFamily(fontFamily: EcoSettings['fontFamily']) {
+    setSettings((prev) => ({ ...prev, fontFamily }))
+  }
+
   return (
-    <SettingsContext.Provider value={{ settings, setTheme, setFontSize, setTtsSpeed }}>
+    <SettingsContext.Provider value={{ settings, setTheme, setFontSize, setTtsSpeed, setFontFamily }}>
       {children}
     </SettingsContext.Provider>
   )

@@ -4,6 +4,7 @@ export interface EcoSettings {
   theme: 'light' | 'dark' | 'hc-light' | 'hc-dark'
   fontSize: 'sm' | 'md' | 'lg' | 'xl'
   ttsSpeed: 'slow' | 'normal' | 'fast' | 'very-fast'
+  fontFamily: 'hyperlegible' | 'inter' | 'lexend' | 'system'
 }
 
 export const SETTINGS_KEY = 'eco-settings'
@@ -12,6 +13,7 @@ export const DEFAULT_SETTINGS: EcoSettings = {
   theme: 'light',
   fontSize: 'md',
   ttsSpeed: 'normal',
+  fontFamily: 'hyperlegible',
 }
 
 // Mapeo de velocidad TTS a SpeechSynthesis.rate (§6.5)
