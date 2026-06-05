@@ -1,32 +1,69 @@
 'use client'
 
-// Accesibilidad: el control carrusel tiene rol "group" con aria-labelledby
-// apuntando al id del título. Los botones < y > tienen aria-label dinámico
-// ("Tema anterior" / "Siguiente tema"). El valor actual usa aria-live="polite"
-// para anunciar el cambio al navegar. Las teclas Izquierda/Derecha también
-// cambian el valor (§6.5 SPECIFICATION.md).
-
-// TODO: implementar en la fase Ajustes
+// Accesibilidad: rol "group" con aria-labelledby apuntando al label.
+// Botones prev/next tienen aria-label dinámico basado en la prop label.
+// El valor actual usa aria-live="polite" para anunciar cambios al navegar.
+// Teclas ← → cambian el valor cuando el foco está en el grupo (§6.5).
 
 interface SettingCarouselProps {
   label: string
-  value: string
-  options: string[]
+  options: readonly string[]
+  currentIndex: number
+  onChange: (index: number) => void
 }
 
-export default function SettingCarousel({ label, value, options }: SettingCarouselProps) {
-  // options se usará en la implementación real para navegar entre valores
-  void options
+export default function SettingCarousel({ label, options, currentIndex, onChange }: SettingCarouselProps) {
   const labelId = `carousel-label-${label.toLowerCase().replace(/\s+/g, '-')}`
+  const count = options.length
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      onChange((currentIndex - 1 + count) % count)
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      onChange((currentIndex + 1) % count)
+    }
+  }
 
   return (
-    <div role="group" aria-labelledby={labelId}>
-      <p id={labelId} className="font-medium text-[var(--color-text-primary)]">
+    <div
+      role="group"
+      aria-labelledby={labelId}
+      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+    >
+      <p
+        id={labelId}
+        className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]"
+      >
         {label}
       </p>
-      {/* Placeholder: control < valor > */}
-      <div aria-live="polite" aria-atomic="true">
-        <p className="text-[var(--color-text-secondary)]">{value}</p>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => onChange((currentIndex - 1 + count) % count)}
+          onKeyDown={handleKeyDown}
+          aria-label={`${label} anterior`}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-2xl text-[var(--color-text-primary)] hover:bg-[var(--color-header-bg)]"
+        >
+          ‹
+        </button>
+        <div
+          aria-live="polite"
+          aria-atomic="true"
+          className="flex-1 text-center text-base font-semibold text-[var(--color-text-primary)]"
+        >
+          {options[currentIndex]}
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange((currentIndex + 1) % count)}
+          onKeyDown={handleKeyDown}
+          aria-label={`Siguiente ${label.toLowerCase()}`}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] text-2xl text-[var(--color-text-primary)] hover:bg-[var(--color-header-bg)]"
+        >
+          ›
+        </button>
       </div>
     </div>
   )

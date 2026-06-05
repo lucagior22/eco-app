@@ -1,6 +1,8 @@
 # SPECIFICATION.md — eco-app
 
 > Fuente de verdad para el agente. Ante cualquier ambigüedad, este archivo tiene prioridad.
+>
+> **Diseño (Figma):** https://www.figma.com/design/AebURRhSh0VGRnlkDrApKA/Prototipo---TP-final
 
 ---
 
