@@ -30,9 +30,9 @@ export function Navigation() {
                 aria-current={isActive ? 'page' : undefined}
                 className={`flex flex-col items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)] ${
                   isActive
-                    ? 'border-b-2 border-[var(--color-accent-blue)] text-[var(--color-accent-blue)]'
+                    ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)]'
                     : ''
-                } md:w-full md:flex-col md:items-center md:rounded-none md:border-b-0 md:py-3 ${isActive ? 'md:border-b-0 md:border-l-2 md:border-[var(--color-accent-blue)]' : ''} `}
+                } md:w-full md:flex-col md:items-center md:rounded-none md:border-b-0 md:py-3 ${isActive ? 'md:border-b-0 md:border-l-2 md:border-[var(--color-accent)]' : ''} `}
               >
                 <span aria-hidden="true" className="text-xl leading-none">
                   {emoji}

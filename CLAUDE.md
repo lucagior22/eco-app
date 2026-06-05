@@ -119,6 +119,7 @@ Este proyecto es un TFI académico. La documentación sirve de evidencia del pro
 | `AGENTS.md` (raíz) | Reglas para agentes inyectadas por `create-next-app`. Apunta a docs de Next en `node_modules`. Nota: fue generado por la tool de Next 16, pero el proyecto está pineado en **Next 15** (ver `DECISIONS.md`). |
 | `claude-docs/README.md` | Índice y propósito de la carpeta `claude-docs/`. |
 | `claude-docs/INFRASTRUCTURE.md` | Documentación de la infraestructura base: versiones, estructura, config de tooling, Docker, gates. |
+| `claude-docs/COLORS.md` | Sistema de colores: paleta de los 4 temas, ratios WCAG, decisiones de ajuste vs Figma. |
 
 ### Carpeta `claude-docs/`
 

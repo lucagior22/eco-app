@@ -13,3 +13,4 @@ Cuando generes documentación técnica que no sea uno de los docs canónicos de 
 | Documento | Contenido |
 | --- | --- |
 | [`INFRASTRUCTURE.md`](./INFRASTRUCTURE.md) | Infraestructura base inicializada: versiones del stack, estructura de archivos, configuración (Serwist, ESLint, Prettier, TS), estado global/tema/navegación, Docker y gates de verificación. |
+| [`COLORS.md`](./COLORS.md) | Sistema de colores: paleta completa (4 temas), ratios de contraste WCAG, decisiones de ajuste respecto al Figma, reglas de uso. |

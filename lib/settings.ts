@@ -1,7 +1,7 @@
 // Persistencia de preferencias de accesibilidad en localStorage (§6.5 SPECIFICATION.md).
 
 export interface EcoSettings {
-  theme: 'light' | 'dark' | 'high-contrast'
+  theme: 'light' | 'dark' | 'hc-light' | 'hc-dark'
   fontSize: 'sm' | 'md' | 'lg' | 'xl'
   ttsSpeed: 'slow' | 'normal' | 'fast' | 'very-fast'
 }
