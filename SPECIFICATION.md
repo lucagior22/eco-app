@@ -269,16 +269,20 @@ Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
 
 **Comportamiento (v1 — detección mockeada):**
 
-1. Al entrar: pedir permiso de cámara, mostrar stream en tiempo real
-2. Botón "Detectar" (o detección automática cada 2s): tomar frame del stream
-3. Mostrar overlay de bounding box rojo sobre la imagen congelada
+1. Al entrar: pedir permiso de cámara automáticamente
+   - Si se deniega: mostrar mensaje de error descriptivo en pantalla (no bloquear la UI entera)
+2. Mostrar stream de cámara en tiempo real (el video nunca se congela)
+3. Botón "Detectar pedal": al presionar, muestra overlay de bounding box rojo encima del video en vivo
 4. Mostrar datos mockeados del pedal detectado:
    - Nombre: "BOSS DS-1"
    - Tone: 50%, Level: 50%, Dist: 50%
    - Check LED: OFF (en rojo)
-5. Narrar via TTS: "Pedal BOSS DS-1 detectado. Tone al 50%. Level al 50%. Distorsión al 50%. LED apagado."
+5. Narrar via TTS automáticamente: "Pedal BOSS DS-1 detectado. Tone al 50%. Level al 50%. Distorsión al 50%. LED apagado."
+6. El mismo botón cambia a "Detectar de nuevo" tras una detección; al presionarlo limpia el resultado y repite desde el paso 3
 
 **Nota de implementación:** los datos del pedal son fijos en v1. La UI debe estar construida para recibir datos dinámicos en v2.
+
+> **Implementado (v1):** detección manual únicamente (se eliminó la opción automática cada 2s). El stream permanece en vivo durante y después de la detección; el bounding box es un overlay CSS sobre el video. El botón "Detectar pedal" se reutiliza como "Detectar de nuevo" para evitar duplicar controles.
 
 **Accesibilidad específica:**
 
