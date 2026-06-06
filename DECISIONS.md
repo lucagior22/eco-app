@@ -86,6 +86,51 @@ Evita costos de nube (VPS, CDN). Cloudflare Tunnel provee HTTPS, protección DDo
 
 ---
 
+## 2026-06-05 — Afinador: AnalyserNode + requestAnimationFrame (no ScriptProcessorNode)
+
+**Decisión:** La captura de audio usa `AnalyserNode` + `getFloatTimeDomainData` en un loop `requestAnimationFrame`, no `ScriptProcessorNode` ni `AudioWorklet`.
+
+**Razones:**
+`ScriptProcessorNode` entrega buffers zerizados de forma intermitente en Chromium/Windows (bug conocido del scheduler). `AudioWorklet` requiere un archivo worker separado y más boilerplate. El patrón `AnalyserNode + rAF` es el canónico de la implementación de referencia cwilso/PitchDetect: funciona en todos los browsers modernos, no tiene el bug de Chromium, y es significativamente más simple. Se agrega un `GainNode` con `gain=0` conectado al `destination` para forzar el procesamiento del grafo de audio (sin él, Chrome puede no enviar muestras al `AnalyserNode`).
+
+---
+
+## 2026-06-05 — Afinador: nota basada en cuerda más cercana (no MIDI cromático)
+
+**Decisión:** En modo automático, la nota mostrada y narrada se deriva de la cuerda de guitarra más cercana en frecuencia (`closestStringIndex`), no del cálculo MIDI cromático estándar.
+
+**Razones:**
+`frequencyToNote` (MIDI) redondea al semitono más cercano en la escala cromática. Si la cuerda B (246.94 Hz) está 50+ cents sostenida, el cálculo MIDI devuelve C (261.63 Hz) y el afinador anunciaría "Do". Un afinador de guitarra debe decir "Si: un poco alto", no "Do". Usando la cuerda como referencia, el nombre siempre corresponde a la cuerda que el usuario está afinando, y los cents expresan la desviación respecto a la afinación estándar de esa cuerda.
+
+---
+
+## 2026-06-05 — Afinador: histéresis en umbral de afinado
+
+**Decisión:** El estado "afinado" usa dos umbrales distintos: entra en "afinado" con ≤10 cents de desviación, pero permanece en "afinado" hasta superar los 20 cents (histéresis).
+
+**Razones:**
+Un umbral único de 10 cents provoca flip-flop cuando la cuerda está en el borde: una detección en 8 cents → "afinado", la siguiente en 12 cents → "bajo", alternando entre dos estados en tocadas consecutivas. La histéresis elimina esta oscilación sin sacrificar precisión: el usuario entra en "afinado" con ±10 cents y la narración se mantiene estable hasta que la cuerda se desafine claramente.
+
+---
+
+## 2026-06-05 — Afinador: modo cuerda-a-cuerda
+
+**Decisión:** Se agregó un modo de selección de cuerda individual: el usuario elige una cuerda (E A D G B E) y la detección se filtra a esa frecuencia con normalización de octava.
+
+**Razones:**
+En modo automático, el algoritmo YIN puede confundir cuerdas adyacentes o detectar armónicos. La normalización de octava en `centsToTarget` permite que tanto E2 detectado como E3 (armónico) computen la misma desviación en cents respecto a la cuerda seleccionada. Esto mejora significativamente la consistencia de detección, en particular para la 6ª cuerda (E2 = 82 Hz, señal débil).
+
+---
+
+## 2026-06-05 — Afinador: pausa durante TTS para evitar feedback
+
+**Decisión:** La detección de pitch se pausa mientras el sintetizador de voz está activo (`isSpeakingRef`), y se reanuda 300 ms después del evento `onend`.
+
+**Razones:**
+Sin pausa, el audio del TTS es captado por el micrófono. YIN interpreta la señal de voz como una nota musical, generando detecciones espurias que a su vez disparan más locuciones TTS. El ciclo de retroalimentación hace la pantalla inutilizable. La pausa de 300 ms post-`onend` da tiempo al sistema de audio a drenar antes de retomar la captura.
+
+---
+
 ## 2026-06-01 — Tailwind CSS v4
 
 **Decisión:** Se usa Tailwind CSS v4 (config CSS-first, sin `tailwind.config.js`).
