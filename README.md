@@ -4,15 +4,13 @@ PWA para músicos con discapacidad visual: afinador, lector de partituras, metr�
 
 ## Pantallas
 
-La infraestructura base (rutas, layout, navegación, PWA, Docker) está completa. Las pantallas tienen estructura de placeholder; la lógica de features está pendiente.
-
-| Pantalla       | Ruta                   | Estado       |
-| -------------- | ---------------------- | ------------ |
-| Afinador       | `/afinador`            | ⬜ Pendiente |
-| Leer partitura | `/partitura`           | ⬜ Pendiente |
-| Metrónomo      | `/partitura/metronomo` | ⬜ Pendiente |
-| Detectar pedal | `/pedal`               | ⬜ Pendiente |
-| Ajustes        | `/ajustes`             | ⬜ Pendiente |
+| Pantalla       | Ruta                   | Estado          |
+| -------------- | ---------------------- | --------------- |
+| Afinador       | `/afinador`            | ✅ Completo     |
+| Leer partitura | `/partitura`           | ⬜ Pendiente    |
+| Metrónomo      | `/partitura/metronomo` | ⬜ Pendiente    |
+| Detectar pedal | `/pedal`               | ⬜ Pendiente    |
+| Ajustes        | `/ajustes`             | ⬜ Pendiente    |
 
 ## Stack
 

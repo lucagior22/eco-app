@@ -184,14 +184,27 @@ Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
 
 1. Al entrar a la pantalla, pedir permiso de micrófono automáticamente
 2. Capturar audio continuo con `AudioContext` + `ScriptProcessorNode` o `AudioWorklet`
+
+   > **Implementado:** se usa `AnalyserNode` + `requestAnimationFrame` en lugar de `ScriptProcessorNode`. `ScriptProcessorNode` entrega buffers zerizados intermitentemente en Chromium/Windows. Ver DECISIONS.md.
+
 3. Procesar con `pitchfinder` (algoritmo YIN, buffer 2048)
+
+   > **Implementado:** buffer de 4096 muestras (no 2048). A 44100 Hz da ~93 ms de latencia, aceptable para detección estable de E2 (82 Hz). YIN con `threshold: 0.15` (no el default 0.10) para mejorar la detección de la 6ª cuerda.
+
 4. Detectar la nota más cercana en escala cromática (A4 = 440 Hz)
+
+   > **Implementado:** la nota mostrada y narrada se deriva de la cuerda de guitarra más cercana (no de la escala cromática). Así "B ligeramente sostenida" sigue diciéndose "Si", no "Do". Ver DECISIONS.md.
 5. Calcular desviación en centavos
 6. Actualizar display y narrar via TTS:
    - Si |centavos| < 10: "Re. Afinado." (narrar máximo cada 3 segundos)
    - Si centavos > 10: "Re. Un poco alto."
    - Si centavos < -10: "Re. Un poco bajo."
+
+   > **Implementado:** umbral con histéresis: entra en "afinado" con ≤10 cents, sale con >20 cents. Evita flip-flop en tocadas consecutivas cerca del umbral. La detección se pausa mientras el TTS habla para evitar que el micrófono capte la voz sintetizada.
+
 7. En desktop: mostrar selector de micrófono (dropdown con `enumerateDevices`)
+
+   > **Implementado:** también se agregó selección de cuerda individual (E A D G B E). El usuario puede tocar una cuerda para filtrar la detección a esa frecuencia; mejora la precisión, especialmente en la 6ª cuerda (E2).
 
 **Elementos visuales:**
 
