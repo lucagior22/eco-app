@@ -5,15 +5,26 @@
 // cambia según el estado. El overlay de bounding box es aria-hidden="true"
 // (decorativo; el resultado se anuncia via aria-live en PedalScreen).
 
+import { useEffect, useRef } from 'react'
 import { useCamera } from '@/hooks/useCamera'
 
 interface CameraViewProps {
   detected: boolean
   onDetect: () => void
+  onReady?: () => void
 }
 
-export default function CameraView({ detected, onDetect }: CameraViewProps) {
+export default function CameraView({ detected, onDetect, onReady }: CameraViewProps) {
   const { videoRef, isActive, error } = useCamera()
+  const buttonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (isActive) {
+      onReady?.()
+      // Mover el foco al botón para que el usuario solo tenga que doble-tapear
+      buttonRef.current?.focus()
+    }
+  }, [isActive]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error) {
     return (
@@ -61,6 +72,7 @@ export default function CameraView({ detected, onDetect }: CameraViewProps) {
       </div>
 
       <button
+        ref={buttonRef}
         type="button"
         onClick={onDetect}
         disabled={!isActive}
@@ -69,7 +81,7 @@ export default function CameraView({ detected, onDetect }: CameraViewProps) {
             ? 'Detectar pedal de nuevo con la cámara'
             : 'Detectar pedal con la cámara'
         }
-        className="w-full rounded-lg bg-[var(--color-accent-blue)] px-6 py-3 font-semibold text-white focus:outline-2 focus:outline-offset-2 focus:outline-[var(--color-accent-blue)] disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-lg bg-[var(--color-accent)] px-6 py-3 font-semibold text-white focus:outline-2 focus:outline-offset-2 focus:outline-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {detected ? 'Detectar de nuevo' : 'Detectar pedal'}
       </button>

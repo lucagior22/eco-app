@@ -11,12 +11,17 @@ import PedalInfo from '@/components/pedal/PedalInfo'
 import { speak } from '@/lib/tts'
 import { useSettings } from '@/contexts/SettingsContext'
 
+const TTS_READY = 'Cámara lista. Presioná el botón Detectar pedal para identificar el pedal.'
 const TTS_RESULT =
-  'Pedal BOSS DS-1 detectado. Tone al 50%. Level al 50%. Distorsión al 50%. LED apagado.'
+  'Pedal BOSS DS-1 detectado. Tone al 50%. Level al 50%. Distorsión al 50%. LED apagado. Presioná Detectar de nuevo para volver a identificar.'
 
 export default function PedalScreen() {
   const { settings } = useSettings()
   const [detected, setDetected] = useState(false)
+
+  function handleReady() {
+    speak(TTS_READY, settings.ttsSpeed)
+  }
 
   function handleDetect() {
     if (detected) {
@@ -29,7 +34,7 @@ export default function PedalScreen() {
 
   return (
     <div className="flex flex-col gap-6 p-4">
-      <CameraView detected={detected} onDetect={handleDetect} />
+      <CameraView detected={detected} onDetect={handleDetect} onReady={handleReady} />
       <div aria-live="polite" aria-atomic="true">
         {detected && <PedalInfo />}
       </div>
