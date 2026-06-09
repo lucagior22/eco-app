@@ -5,6 +5,7 @@
 import type { EcoSettings } from '@/lib/settings'
 import { TTS_SPEED_RATES } from '@/lib/settings'
 
+
 export function speak(text: string, speed: EcoSettings['ttsSpeed'] = 'normal'): void {
   if (!isTtsSupported()) return
   cancelSpeech()
