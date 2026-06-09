@@ -7,7 +7,7 @@
 import { type RefObject, useEffect, useRef, useState } from 'react'
 
 export interface UseCameraResult {
-  videoRef: RefObject<HTMLVideoElement>
+  videoRef: RefObject<HTMLVideoElement | null>
   isActive: boolean
   error: string | null
 }

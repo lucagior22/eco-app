@@ -30,6 +30,7 @@ No "mejores" código no relacionado con la tarea. No elimines dead code preexist
 
 En tareas de múltiples pasos, presentá un plan breve y esperá confirmación antes de ejecutar.
 Definí criterios de éxito verificables para cada tarea.
+Al terminar cada feature, ejecutá `npm run build` y verificá que compile sin errores antes de reportar la tarea como completa.
 
 ---
 
