@@ -137,16 +137,16 @@ La única alerta corresponde al elemento `<video>` sin subtítulos (`<track>`), 
 
 | Criterio | Descripción                 | Resultado                                                |
 | -------- | --------------------------- | -------------------------------------------------------- |
-| 1.1.1    | Contenido no textual        | ✅ Íconos decorativos marcados `aria-hidden`              |
-| 1.3.1    | Información y relaciones    | ✅ `dl`, `nav`, `main`, `header` correctamente usados     |
-| 1.3.3    | Características sensoriales | ✅ Estado del LED y nav activa usan texto además de color |
-| 1.4.3    | Contraste mínimo            | ✅ Cumple AA en todos los temas                           |
-| 2.1.1    | Teclado                     | ✅ Navegación completa sin mouse                          |
-| 2.4.1    | Evitar bloques              | ✅ Skip link en todas las páginas                         |
-| 2.4.2    | Página con título           | ✅ Title único en cada ruta                               |
-| 2.4.7    | Foco visible                | ✅ Outline visible en todos los elementos focusables      |
-| 3.1.1    | Idioma de la página         | ✅ `lang="es"` en `<html>`                                |
-| 4.1.2    | Nombre, función, valor      | ✅ Roles y estados ARIA correctos                         |
+| 1.1.1    | Contenido no textual        | Íconos decorativos marcados `aria-hidden`              |
+| 1.3.1    | Información y relaciones    | `dl`, `nav`, `main`, `header` correctamente usados     |
+| 1.3.3    | Características sensoriales | Estado del LED y nav activa usan texto además de color |
+| 1.4.3    | Contraste mínimo            | Cumple AA en todos los temas                           |
+| 2.1.1    | Teclado                     | Navegación completa sin mouse                          |
+| 2.4.1    | Evitar bloques              | Skip link en todas las páginas                         |
+| 2.4.2    | Página con título           | Title único en cada ruta                               |
+| 2.4.7    | Foco visible                | Outline visible en todos los elementos focusables      |
+| 3.1.1    | Idioma de la página         | `lang="es"` en `<html>`                                |
+| 4.1.2    | Nombre, función, valor      | Roles y estados ARIA correctos                         |
 
 ---
 
@@ -156,11 +156,11 @@ Se deshabilitó JavaScript desde Chrome DevTools y se navegaron las tres pantall
 
 | Elemento                                 | Resultado                                                               |
 | ---------------------------------------- | ----------------------------------------------------------------------- |
-| Navegación principal                     | ✅ Renderiza correctamente vía SSR                                       |
-| Títulos y descripciones de cada pantalla | ✅ Visibles — Next.js sirve el HTML completo                             |
-| Botones de ajustes                       | ⚠️ No responden — requieren event handlers de React                     |
-| Habilitación de cámara (`/pedal`)        | ⚠️ Permanece en estado "Iniciando cámara" — requiere `MediaDevices API` |
-| Habilitación de micrófono (`/afinador`)  | ⚠️ No se activa — requiere `Web Audio API`                              |
+| Navegación principal                     | Renderiza correctamente vía SSR                                       |
+| Títulos y descripciones de cada pantalla | Visibles — Next.js sirve el HTML completo                             |
+| Botones de ajustes                       | No responden — requieren event handlers de React                     |
+| Habilitación de cámara (`/pedal`)        | Permanece en estado "Iniciando cámara" — requiere `MediaDevices API` |
+| Habilitación de micrófono (`/afinador`)  | No se activa — requiere `Web Audio API`                              |
 
 El comportamiento es correcto. La app es una PWA que opera sobre APIs de browser (MediaDevices, Web Audio, Web Speech) que son inherentemente dependientes de JavaScript. Sin JS, Next.js entrega el HTML estructural completo vía SSR — títulos, navegación, descripciones — cumpliendo el requisito de contenido útil sin scripts. Las funcionalidades interactivas quedan en su estado inicial, no en una pantalla en blanco.
 
@@ -184,10 +184,10 @@ Se probó la app en cuatro navegadores distintos, verificando layout, navegació
 
 | Navegador | Motor | Resultado                |
 | --------- | ----- | ------------------------ |
-| Chrome    | Blink | ✅ Funciona correctamente |
-| Brave     | Blink | ✅ Funciona correctamente |
-| Edge      | Blink | ✅ Funciona correctamente |
-| Firefox   | Gecko | ✅ Funciona correctamente |
+| Chrome    | Blink | Funciona correctamente |
+| Brave     | Blink | Funciona correctamente |
+| Edge      | Blink | Funciona correctamente |
+| Firefox   | Gecko | Funciona correctamente |
 
 El comportamiento es consistente en todos los navegadores probados. Las APIs utilizadas (MediaDevices, Web Audio, Web Speech) tienen soporte completo en los distintos motores modernos.
 
@@ -199,10 +199,10 @@ Se probó el layout en distintas resoluciones usando Chrome DevTools (modo respo
 
 | Resolución | Dispositivo | Resultado                              |
 | ---------- | ----------- | -------------------------------------- |
-| 375×667    | iPhone SE   | ✅ Funcional — con excepción nota abajo |
-| 390×844    | iPhone 14   | ✅ Funciona correctamente               |
-| 1280×800   | Laptop      | ✅ Funciona correctamente               |
-| 1920×1080  | Desktop     | ✅ Funciona correctamente               |
+| 375×667    | iPhone SE   | Funcional — con excepción nota abajo |
+| 390×844    | iPhone 14   | Funciona correctamente               |
+| 1280×800   | Laptop      | Funciona correctamente               |
+| 1920×1080  | Desktop     | Funciona correctamente               |
 
 **Observación — fuente muy grande en pantalla pequeña:**
 
@@ -228,11 +228,11 @@ Está construido sobre Next.js 15, TypeScript y Tailwind CSS. Para las funciones
 
 | Pantalla                           | Estado                                                                    |
 | ---------------------------------- | ------------------------------------------------------------------------- |
-| Ajustes (`/ajustes`)               | ✅ Completo                                                                |
-| Detectar pedal (`/pedal`)          | ✅ Completo (detección mock)                   |
-| Leer partitura (`/partitura`)      | 🚧 UI e integración backend implementadas — OCR sin validar en producción |
-| Afinador (`/afinador`)             | 🚧 Estructura definida, lógica pendiente                                  |
-| Metrónomo (`/partitura/metronomo`) | 🚧 Estructura definida, lógica pendiente                                  |
+| Ajustes (`/ajustes`)               | Completo                                                                |
+| Detectar pedal (`/pedal`)          | Completo (detección mock)                   |
+| Leer partitura (`/partitura`)      | UI e integración backend implementadas — OCR sin validar en producción |
+| Afinador (`/afinador`)             | Estructura definida, lógica pendiente                                  |
+| Metrónomo (`/partitura/metronomo`) | Estructura definida, lógica pendiente                                  |
 
 ---
 
