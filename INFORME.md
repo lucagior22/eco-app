@@ -1,11 +1,5 @@
 # Informe — Eco: Asistente Musical Accesible
 
-**Materia:** Diseño de Interfaces Web  
-**Entrega:** Versión inicial del sistema  
-**Aplicación:** PWA accesible para músicos con discapacidad visual
-
----
-
 # Parte 1 — Investigación y evaluación de accesibilidad
 
 ---
@@ -28,6 +22,8 @@ useEffect(() => {
 **Acordes en español para TTS.** Los nombres de acordes en notación estándar son ininteligibles para un sintetizador de voz: "Bm" se leería "bi eme", "C#maj7" no significa nada hablado. Se implementó `chordToSpanish()` que convierte cualquier acorde antes de pasarlo al narrador: "Am" → "La menor", "C#maj7" → "Do sostenido mayor séptima". Un caso especial es "Bm": sin la conversión el TTS diría "Sim", que es un homófono de "sí mismo" y genera confusión.
 
 **Color nunca como único diferenciador.** El estado del LED en la pantalla de pedal se muestra con un círculo de color más texto explícito ("Encendido" / "Apagado"). El ítem activo en la navegación tiene `aria-current="page"` y un subrayado visible, no solo un cambio de color. Esto cubre tanto a usuarios con daltonismo como a quienes usan lectores de pantalla.
+
+**Narrador como primer foco en el afinador.** La pantalla `/afinador` tiene seis botones de selección de cuerda que aparecen visualmente primero, pero en términos de orden de tabulación eso crea un problema: un usuario ciego llega a la pantalla y no puede silenciar el narrador antes de que empiece a hablar, porque el foco cae primero en las cuerdas. La solución fue reordenar el DOM para que los botones de control (Narrador y Pausar) queden antes del display del afinador, sin modificar el layout visual. Así el primer Tab del usuario llega al botón Narrador, que puede activar o desactivar antes de que el audio empiece.
 
 **Anti-flash de tema.** Al cargar la app, existe un instante donde JavaScript todavía no corrió y el tema guardado no está aplicado. Para evitar ese flash visual, se ejecuta un script síncrono en el `<head>` que lee las preferencias de `localStorage` y aplica los atributos al `<html>` antes del primer render.
 
@@ -65,12 +61,12 @@ Toda la app es operable sin mouse. Tab y Shift+Tab recorren los elementos en ord
 
 Los cuatro temas cumplen WCAG 2.2 nivel AA o superior:
 
-| Tema | Ratio texto/fondo |
-|---|---|
-| Claro | ~7:1 |
-| Oscuro | ~18:1 |
-| Alto contraste claro | 21:1 |
-| Alto contraste oscuro | 21:1 |
+| Tema                  | Ratio texto/fondo |
+| --------------------- | ----------------- |
+| Claro                 | ~7:1              |
+| Oscuro                | ~18:1             |
+| Alto contraste claro  | 21:1              |
+| Alto contraste oscuro | 21:1              |
 
 ### Tipografía
 
@@ -82,20 +78,9 @@ El default es Atkinson Hyperlegible, diseñada por el Braille Institute para usu
 
 ### Validador HTML W3C — pantalla `/pedal`
 
-Se validó el HTML de la pantalla `/pedal` mediante validator.w3.org. La validación por input directo (copiar el fuente) arrojó dos errores; la validación por URI arrojó cero errores y cero warnings.
+Se validó el HTML de la pantalla `/pedal` mediante validator.w3.org por URI.
 
-**Resultado por URI: 0 errores, 0 warnings.**
-
-| Método | Errores | Observación |
-|---|---|---|
-| Input directo | 2 | Artefactos del método — ver análisis |
-| Por URI | 0 | Resultado definitivo |
-
-**Análisis de los errores en input directo:**
-
-1. *"Start tag seen without seeing a doctype first"* — el `<!DOCTYPE html>` está presente en el HTML real pero quedó fuera del fragmento copiado desde "Ver código fuente". No es un error de la app.
-
-2. *"Charset attribute found after the first 1024 bytes"* — al copiar el fuente, Next.js 15 App Router incluye bloques `<style>` de React Aria y múltiples `<link rel="preload">` de fuentes antes del `<meta charset>`, superando el umbral. Al validar por URI, el documento renderizado posiciona el charset correctamente (columna 128, inmediatamente después de `<html>`).
+**Resultado: 0 errores, 0 warnings.**
 
 Los avisos `Info` sobre *trailing slash on void elements* (`<meta/>`, `<link/>`) son comportamiento de React/JSX: el servidor renderiza elementos void con cierre explícito (`/>`). Es sintaxis XHTML válida en HTML5 y no constituye error.
 
@@ -111,7 +96,7 @@ El validador analiza el archivo CSS generado por el build de Tailwind (`_next/st
 
 **Por qué ocurre esto**
 
-El validador W3C opera con el perfil **CSS Level 3**. Tailwind CSS v4 — la versión usada en este proyecto — adoptó `@property` como parte central de su arquitectura. Esta regla pertenece a la especificación **CSS Properties & Values API Level 1** (parte de CSS Houdini), una spec posterior a CSS3 que el validador no reconoce. El resultado es que 30 de los 32 errores son instancias del mismo falso positivo: el validador no conoce `@property`, no que el CSS esté mal escrito.
+El validador W3C opera con el perfil **CSS Level 3**. Tailwind CSS v4 — la versión usada en este proyecto — adoptó `@property` como parte central de su arquitectura. Esta regla pertenece a la especificación **CSS Properties & Values API Level 1** (parte de CSS Houdini), una spec posterior a CSS3 que el validador no reconoce. El resultado es que 30 de los 32 errores son instancias del mismo falso positivo: el validador no conoce `@property`.
 
 Tailwind v4 genera bloques como el siguiente para tipar sus custom properties de gradientes, sombras y transiciones:
 
@@ -125,22 +110,6 @@ Tailwind v4 genera bloques como el siguiente para tipar sus custom properties de
 
 Esto es comportamiento de diseño del framework y no puede eliminarse sin abandonar Tailwind v4. La regla `@property` tiene soporte completo en todos los navegadores modernos (Chrome, Firefox, Edge, Safari).
 
-**Desglose de errores (32):**
-
-| Tipo | Cantidad | Causa |
-|---|---|---|
-| `Unrecognized at-rule @property` | 30 | Tailwind v4 — CSS Houdini, fuera del perfil Level 3 |
-| `Property margin-trim doesn't exist` | 1 | Propiedad CSS moderna aún no registrada en el validador Level 3 |
-| Custom property en `transition-property` | 1 | Tailwind anima variables CSS — válido en CSS moderno |
-
-**Desglose de warnings (140):**
-
-| Tipo | Causa |
-|---|---|
-| CSS variables no verificables estáticamente | El validador no puede resolver `var()` en tiempo de análisis |
-| Vendor prefixes (`-webkit-*`, `-moz-*`) | Reset de Tailwind para compatibilidad cross-browser |
-| Font family sin comillas | Tailwind base styles |
-
 **Conclusión:** los errores reportados no son defectos del código sino una limitación del perfil de validación CSS Level 3 frente a un framework moderno. El CSS funciona correctamente en producción. Este resultado ilustra una tensión real en el ecosistema web: los validadores oficiales de la W3C no siempre reflejan el estado actual de las especificaciones que la misma W3C publica.
 
 ---
@@ -149,16 +118,16 @@ Esto es comportamiento de diseño del framework y no puede eliminarse sin abando
 
 Se evaluó la pantalla de detección de pedal con WAVE (Web Accessibility Evaluation Tool). Es la pantalla más compleja del sistema en términos de accesibilidad, ya que combina video en vivo, detección con feedback hablado y estado dinámico.
 
-**Resultado: AIM Score 10/10. 0 errores, 0 errores de contraste.**
+**Resultado: AIM Score 10/10. 0 errores.**
 
-| Categoría | Resultado |
-|---|---|
-| Errors | 0 |
-| Contrast Errors | 0 |
-| Alerts | 1 |
-| Features | 1 |
-| Structure | 5 |
-| ARIA | 11 |
+| Categoría       | Resultado |
+| --------------- | --------- |
+| Errors          | 0         |
+| Contrast Errors | 0         |
+| Alerts          | 1         |
+| Features        | 1         |
+| Structure       | 5         |
+| ARIA            | 11        |
 
 La única alerta corresponde al elemento `<video>` sin subtítulos (`<track>`), lo cual es técnicamente correcto según WCAG pero no aplica en este contexto: el video es un stream de cámara en vivo, no contenido multimedia con audio. No se agrega una pista de subtítulos porque no hay audio que transcribir.
 
@@ -166,18 +135,18 @@ La única alerta corresponde al elemento `<video>` sin subtítulos (`<track>`), 
 
 ### Criterios WCAG 2.2 verificados manualmente
 
-| Criterio | Descripción | Resultado |
-|---|---|---|
-| 1.1.1 | Contenido no textual | ✅ Íconos decorativos marcados `aria-hidden` |
-| 1.3.1 | Información y relaciones | ✅ `dl`, `nav`, `main`, `header` correctamente usados |
-| 1.3.3 | Características sensoriales | ✅ Estado del LED y nav activa usan texto además de color |
-| 1.4.3 | Contraste mínimo | ✅ Cumple AA en todos los temas |
-| 2.1.1 | Teclado | ✅ Navegación completa sin mouse |
-| 2.4.1 | Evitar bloques | ✅ Skip link en todas las páginas |
-| 2.4.2 | Página con título | ✅ Title único en cada ruta |
-| 2.4.7 | Foco visible | ✅ Outline visible en todos los elementos focusables |
-| 3.1.1 | Idioma de la página | ✅ `lang="es"` en `<html>` |
-| 4.1.2 | Nombre, función, valor | ✅ Roles y estados ARIA correctos |
+| Criterio | Descripción                 | Resultado                                                |
+| -------- | --------------------------- | -------------------------------------------------------- |
+| 1.1.1    | Contenido no textual        | ✅ Íconos decorativos marcados `aria-hidden`              |
+| 1.3.1    | Información y relaciones    | ✅ `dl`, `nav`, `main`, `header` correctamente usados     |
+| 1.3.3    | Características sensoriales | ✅ Estado del LED y nav activa usan texto además de color |
+| 1.4.3    | Contraste mínimo            | ✅ Cumple AA en todos los temas                           |
+| 2.1.1    | Teclado                     | ✅ Navegación completa sin mouse                          |
+| 2.4.1    | Evitar bloques              | ✅ Skip link en todas las páginas                         |
+| 2.4.2    | Página con título           | ✅ Title único en cada ruta                               |
+| 2.4.7    | Foco visible                | ✅ Outline visible en todos los elementos focusables      |
+| 3.1.1    | Idioma de la página         | ✅ `lang="es"` en `<html>`                                |
+| 4.1.2    | Nombre, función, valor      | ✅ Roles y estados ARIA correctos                         |
 
 ---
 
@@ -185,13 +154,13 @@ La única alerta corresponde al elemento `<video>` sin subtítulos (`<track>`), 
 
 Se deshabilitó JavaScript desde Chrome DevTools y se navegaron las tres pantallas principales en la versión desplegada en Vercel.
 
-| Elemento | Resultado |
-|---|---|
-| Navegación principal | ✅ Renderiza correctamente vía SSR |
-| Títulos y descripciones de cada pantalla | ✅ Visibles — Next.js sirve el HTML completo |
-| Botones de ajustes | ⚠️ No responden — requieren event handlers de React |
-| Habilitación de cámara (`/pedal`) | ⚠️ Permanece en estado "Iniciando cámara" — requiere `MediaDevices API` |
-| Habilitación de micrófono (`/afinador`) | ⚠️ No se activa — requiere `Web Audio API` |
+| Elemento                                 | Resultado                                                               |
+| ---------------------------------------- | ----------------------------------------------------------------------- |
+| Navegación principal                     | ✅ Renderiza correctamente vía SSR                                       |
+| Títulos y descripciones de cada pantalla | ✅ Visibles — Next.js sirve el HTML completo                             |
+| Botones de ajustes                       | ⚠️ No responden — requieren event handlers de React                     |
+| Habilitación de cámara (`/pedal`)        | ⚠️ Permanece en estado "Iniciando cámara" — requiere `MediaDevices API` |
+| Habilitación de micrófono (`/afinador`)  | ⚠️ No se activa — requiere `Web Audio API`                              |
 
 El comportamiento es correcto. La app es una PWA que opera sobre APIs de browser (MediaDevices, Web Audio, Web Speech) que son inherentemente dependientes de JavaScript. Sin JS, Next.js entrega el HTML estructural completo vía SSR — títulos, navegación, descripciones — cumpliendo el requisito de contenido útil sin scripts. Las funcionalidades interactivas quedan en su estado inicial, no en una pantalla en blanco.
 
@@ -199,7 +168,7 @@ El comportamiento es correcto. La app es una PWA que opera sobre APIs de browser
 
 ### Sin CSS
 
-Se deshabilitaron todos los estilos desde Firefox (Ver → Estilo de página → Sin estilo) y se navegaron las pantallas principales.
+Se deshabilitaron todos los estilos y se navegaron las pantallas principales.
 
 **Resultado: contenido legible y funcional.**
 
@@ -213,14 +182,14 @@ Esto es resultado directo de las decisiones de estructura tomadas durante el des
 
 Se probó la app en cuatro navegadores distintos, verificando layout, navegación por teclado y funcionamiento de las APIs de browser (cámara, micrófono, TTS).
 
-| Navegador | Motor | Resultado |
-|---|---|---|
-| Chrome | Blink | ✅ Referencia base — funciona correctamente |
-| Brave | Blink | ✅ Funciona correctamente |
-| Edge | Blink | ✅ Funciona correctamente |
-| Firefox | Gecko | ✅ Funciona correctamente |
+| Navegador | Motor | Resultado                |
+| --------- | ----- | ------------------------ |
+| Chrome    | Blink | ✅ Funciona correctamente |
+| Brave     | Blink | ✅ Funciona correctamente |
+| Edge      | Blink | ✅ Funciona correctamente |
+| Firefox   | Gecko | ✅ Funciona correctamente |
 
-El comportamiento es consistente en todos los navegadores probados. Las APIs utilizadas (MediaDevices, Web Audio, Web Speech) tienen soporte completo en motores Blink y Gecko modernos.
+El comportamiento es consistente en todos los navegadores probados. Las APIs utilizadas (MediaDevices, Web Audio, Web Speech) tienen soporte completo en los distintos motores modernos.
 
 ---
 
@@ -228,33 +197,16 @@ El comportamiento es consistente en todos los navegadores probados. Las APIs uti
 
 Se probó el layout en distintas resoluciones usando Chrome DevTools (modo responsive).
 
-| Resolución | Dispositivo | Resultado |
-|---|---|---|
-| 375×667 | iPhone SE | ✅ Funcional — con excepción nota abajo |
-| 390×844 | iPhone 14 | ✅ Funciona correctamente |
-| 1280×800 | Laptop | ✅ Funciona correctamente |
-| 1920×1080 | Desktop | ✅ Funciona correctamente |
+| Resolución | Dispositivo | Resultado                              |
+| ---------- | ----------- | -------------------------------------- |
+| 375×667    | iPhone SE   | ✅ Funcional — con excepción nota abajo |
+| 390×844    | iPhone 14   | ✅ Funciona correctamente               |
+| 1280×800   | Laptop      | ✅ Funciona correctamente               |
+| 1920×1080  | Desktop     | ✅ Funciona correctamente               |
 
 **Observación — fuente muy grande en pantalla pequeña:**
 
 En iPhone SE (375px de ancho) con la fuente configurada en tamaño muy grande desde `/ajustes`, algunos elementos desbordan la pantalla. Este es el único caso de overflow detectado, y se da en la combinación del dispositivo más pequeño con la opción de fuente más grande.
-
-Vale notar que el usuario objetivo de la opción de fuente muy grande es alguien con baja visión, que probablemente use el teléfono con zoom del sistema operativo activo — lo que ya implica scroll horizontal. En todos los demás tamaños de dispositivo y configuraciones de fuente, el layout es correcto.
-
----
-
-### Prueba con TalkBack (Android)
-
-Se probó en dispositivo Android con Brave, accediendo vía HTTPS:
-
-1. Al ingresar, TalkBack anuncia el título de la página
-2. La cámara se inicializa → TTS dice "Cámara lista. Presioná el botón Detectar pedal..."
-3. Swipe derecho → TalkBack anuncia "Detectar pedal, botón"
-4. Doble toque → TTS narra el resultado completo del pedal
-
-Todo el flujo es operable sin exploración visual de la pantalla.
-
-> El acceso a cámara requiere HTTPS. En red local el navegador bloquea `navigator.mediaDevices` por política de seguridad. El deployment usa Cloudflare Tunnel para exponer el servidor con HTTPS.
 
 ---
 
@@ -266,21 +218,21 @@ Todo el flujo es operable sin exploración visual de la pantalla.
 
 Eco nació de una observación simple: la mayoría de las herramientas musicales digitales asumen que quien las usa puede ver la pantalla. Para un músico ciego o con baja visión, eso significa que un afinador de guitarra, una app de partituras o un identificador de pedales son básicamente inutilizables. Eco intenta resolver eso.
 
-El sistema cubre cuatro funciones: afinar un instrumento con feedback hablado, leer partituras mediante reconocimiento óptico, identificar pedales de efectos usando la cámara, y personalizar la experiencia visual y auditiva. Todo operado por voz, teclado o lector de pantalla.
+El sistema cubre cuatro funciones: afinar un instrumento con feedback hablado, leer partituras mediante reconocimiento óptico, identificar pedales de efectos usando la cámara, y personalizar la experiencia visual y auditiva. Todo operado por teclado o lector de pantalla.
 
-Está construido sobre Next.js 15, TypeScript y Tailwind CSS. Para las funciones de cámara, voz y audio se usan las APIs nativas del navegador — MediaDevices, Web Speech API y AudioContext — sin librerías externas.
+Está construido sobre Next.js 15, TypeScript y Tailwind CSS. Para las funciones de cámara, voz y audio se usan las APIs nativas del navegador sin librerías externas.
 
 ---
 
 ## 2.2 Estado de la versión inicial
 
-| Pantalla | Estado |
-|---|---|
-| Ajustes (`/ajustes`) | ✅ Completo |
-| Detectar pedal (`/pedal`) | ✅ Completo (detección mock) |
-| Leer partitura (`/partitura`) | 🚧 UI e integración backend implementadas — OCR sin validar en producción |
-| Afinador (`/afinador`) | 🚧 Estructura definida, lógica pendiente |
-| Metrónomo (`/partitura/metronomo`) | 🚧 Estructura definida, lógica pendiente |
+| Pantalla                           | Estado                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------- |
+| Ajustes (`/ajustes`)               | ✅ Completo                                                                |
+| Detectar pedal (`/pedal`)          | ✅ Completo (detección mock)                   |
+| Leer partitura (`/partitura`)      | 🚧 UI e integración backend implementadas — OCR sin validar en producción |
+| Afinador (`/afinador`)             | 🚧 Estructura definida, lógica pendiente                                  |
+| Metrónomo (`/partitura/metronomo`) | 🚧 Estructura definida, lógica pendiente                                  |
 
 ---
 
@@ -290,4 +242,4 @@ La versión inicial demuestra que es posible construir herramientas musicales qu
 
 Lo que está pendiente son las funcionalidades centrales del Afinador y el Metrónomo, y la validación del reconocimiento OCR de partituras en el entorno de producción. La base técnica y de accesibilidad para esas pantallas ya está definida.
 
-Una cosa que quedó clara durante el desarrollo es que diseñar para usuarios ciegos mejora la experiencia para todos. El foco automático al botón, el TTS al inicializar la cámara, la narración de acordes en español — son soluciones que también ayudan a alguien con movilidad reducida, a alguien que está usando la app con la pantalla apagada para ahorrar batería, o simplemente a alguien que prefiere no tener que buscar con la vista cada vez que abre la app.
+Una cosa que quedó clara durante el desarrollo es que diseñar para usuarios ciegos mejora la experiencia para todos. El foco automático al botón, el TTS al inicializar la cámara, la narración de acordes en español — son soluciones que también ayudan a alguien con movilidad reducida o simplemente a alguien que prefiere no tener que buscar con la vista cada vez que abre la app.
