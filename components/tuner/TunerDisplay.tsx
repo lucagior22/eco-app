@@ -56,7 +56,7 @@ export default function TunerDisplay({
                     : 'border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)]',
               ].join(' ')}
             >
-              {s.label}
+              {NOTE_NAMES_ES[s.label] ?? s.label}
             </Button>
           )
         })}

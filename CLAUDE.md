@@ -32,6 +32,16 @@ En tareas de múltiples pasos, presentá un plan breve y esperá confirmación a
 Definí criterios de éxito verificables para cada tarea.
 Al terminar cada feature, ejecutá `npm run build` y verificá que compile sin errores antes de reportar la tarea como completa.
 
+### 5. Informe y validaciones — OBLIGATORIO
+
+El proyecto tiene un `INFORME.md` en la raíz que es entregable académico. Cada vez que el usuario provea resultados de validaciones o contenido para el informe:
+
+- Volcá el contenido en la sección correspondiente de `INFORME.md` de inmediato.
+- Marcá el ítem como `✅ Completo` en `claude-docs/VALIDACIONES-MANUALES.md`.
+- No dejés secciones del informe con placeholders si el usuario ya aportó el contenido.
+
+Las 6 validaciones manuales requeridas están documentadas en `claude-docs/VALIDACIONES-MANUALES.md`. Todas deben completarse antes de considerar el informe terminado.
+
 ---
 
 ## Accesibilidad — reglas no negociables
@@ -121,6 +131,7 @@ Este proyecto es un TFI académico. La documentación sirve de evidencia del pro
 | `claude-docs/README.md` | Índice y propósito de la carpeta `claude-docs/`. |
 | `claude-docs/INFRASTRUCTURE.md` | Documentación de la infraestructura base: versiones, estructura, config de tooling, Docker, gates. |
 | `claude-docs/COLORS.md` | Sistema de colores: paleta de los 4 temas, ratios WCAG, decisiones de ajuste vs Figma. |
+| `claude-docs/VALIDACIONES-MANUALES.md` | Checklist paso a paso de las 6 validaciones manuales requeridas por el enunciado del TFI. |
 
 ### Carpeta `claude-docs/`
 

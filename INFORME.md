@@ -1,4 +1,4 @@
-# Informe de Desarrollo — Eco: Asistente Musical Accesible
+# Informe — Eco: Asistente Musical Accesible
 
 **Materia:** Diseño de Interfaces Web  
 **Entrega:** Versión inicial del sistema  
@@ -6,29 +6,11 @@
 
 ---
 
-## 1. Descripción del proyecto
-
-Eco nació de una observación simple: la mayoría de las herramientas musicales digitales asumen que quien las usa puede ver la pantalla. Para un músico ciego o con baja visión, eso significa que un afinador de guitarra, una app de partituras o un identificador de pedales son básicamente inutilizables. Eco intenta resolver eso.
-
-El sistema cubre cuatro funciones: afinar un instrumento con feedback hablado, leer partituras mediante reconocimiento óptico, identificar pedales de efectos usando la cámara, y personalizar la experiencia visual y auditiva. Todo operado por voz, teclado o lector de pantalla.
-
-Está construido sobre Next.js 15, TypeScript y Tailwind CSS. Para las funciones de cámara, voz y audio se usan las APIs nativas del navegador — MediaDevices, Web Speech API y AudioContext — sin librerías externas.
+# Parte 1 — Investigación y evaluación de accesibilidad
 
 ---
 
-## 2. Estado de la versión inicial
-
-| Pantalla | Estado |
-|---|---|
-| Ajustes (`/ajustes`) | ✅ Completo |
-| Detectar pedal (`/pedal`) | ✅ Completo (detección mock) |
-| Leer partitura (`/partitura`) | 🚧 UI e integración backend implementadas — OCR sin validar en producción |
-| Afinador (`/afinador`) | 🚧 Estructura definida, lógica pendiente |
-| Metrónomo (`/partitura/metronomo`) | 🚧 Estructura definida, lógica pendiente |
-
----
-
-## 3. Decisiones de accesibilidad
+## 1.1 Decisiones de accesibilidad
 
 La accesibilidad no se trató como una lista de requisitos a cumplir al final, sino como el criterio principal de cada decisión de diseño. Algunos ejemplos concretos de cómo eso influyó en la implementación:
 
@@ -51,7 +33,7 @@ useEffect(() => {
 
 ---
 
-## 4. Implementación técnica de accesibilidad
+## 1.2 Implementación técnica de accesibilidad
 
 ### Estructura semántica
 
@@ -96,7 +78,72 @@ El default es Atkinson Hyperlegible, diseñada por el Braille Institute para usu
 
 ---
 
-## 5. Evaluación
+## 1.3 Evaluación
+
+### Validador HTML W3C — pantalla `/pedal`
+
+Se validó el HTML de la pantalla `/pedal` mediante validator.w3.org. La validación por input directo (copiar el fuente) arrojó dos errores; la validación por URI arrojó cero errores y cero warnings.
+
+**Resultado por URI: 0 errores, 0 warnings.**
+
+| Método | Errores | Observación |
+|---|---|---|
+| Input directo | 2 | Artefactos del método — ver análisis |
+| Por URI | 0 | Resultado definitivo |
+
+**Análisis de los errores en input directo:**
+
+1. *"Start tag seen without seeing a doctype first"* — el `<!DOCTYPE html>` está presente en el HTML real pero quedó fuera del fragmento copiado desde "Ver código fuente". No es un error de la app.
+
+2. *"Charset attribute found after the first 1024 bytes"* — al copiar el fuente, Next.js 15 App Router incluye bloques `<style>` de React Aria y múltiples `<link rel="preload">` de fuentes antes del `<meta charset>`, superando el umbral. Al validar por URI, el documento renderizado posiciona el charset correctamente (columna 128, inmediatamente después de `<html>`).
+
+Los avisos `Info` sobre *trailing slash on void elements* (`<meta/>`, `<link/>`) son comportamiento de React/JSX: el servidor renderiza elementos void con cierre explícito (`/>`). Es sintaxis XHTML válida en HTML5 y no constituye error.
+
+---
+
+### Validador CSS W3C — pantalla `/pedal`
+
+Se validó el CSS de la pantalla `/pedal` mediante jigsaw.w3.org/css-validator por URI (perfil CSS Level 3 + SVG).
+
+**Resultado: 32 errores, 140 warnings.**
+
+El validador analiza el archivo CSS generado por el build de Tailwind (`_next/static/css/c07233ad255fff54.css`). Todos los errores son falsos positivos producidos por una incompatibilidad entre el perfil del validador y la versión del framework utilizado: ninguno corresponde a código escrito en la app ni indica un problema funcional.
+
+**Por qué ocurre esto**
+
+El validador W3C opera con el perfil **CSS Level 3**. Tailwind CSS v4 — la versión usada en este proyecto — adoptó `@property` como parte central de su arquitectura. Esta regla pertenece a la especificación **CSS Properties & Values API Level 1** (parte de CSS Houdini), una spec posterior a CSS3 que el validador no reconoce. El resultado es que 30 de los 32 errores son instancias del mismo falso positivo: el validador no conoce `@property`, no que el CSS esté mal escrito.
+
+Tailwind v4 genera bloques como el siguiente para tipar sus custom properties de gradientes, sombras y transiciones:
+
+```css
+@property --tw-gradient-from {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: transparent;
+}
+```
+
+Esto es comportamiento de diseño del framework y no puede eliminarse sin abandonar Tailwind v4. La regla `@property` tiene soporte completo en todos los navegadores modernos (Chrome, Firefox, Edge, Safari).
+
+**Desglose de errores (32):**
+
+| Tipo | Cantidad | Causa |
+|---|---|---|
+| `Unrecognized at-rule @property` | 30 | Tailwind v4 — CSS Houdini, fuera del perfil Level 3 |
+| `Property margin-trim doesn't exist` | 1 | Propiedad CSS moderna aún no registrada en el validador Level 3 |
+| Custom property en `transition-property` | 1 | Tailwind anima variables CSS — válido en CSS moderno |
+
+**Desglose de warnings (140):**
+
+| Tipo | Causa |
+|---|---|
+| CSS variables no verificables estáticamente | El validador no puede resolver `var()` en tiempo de análisis |
+| Vendor prefixes (`-webkit-*`, `-moz-*`) | Reset de Tailwind para compatibilidad cross-browser |
+| Font family sin comillas | Tailwind base styles |
+
+**Conclusión:** los errores reportados no son defectos del código sino una limitación del perfil de validación CSS Level 3 frente a un framework moderno. El CSS funciona correctamente en producción. Este resultado ilustra una tensión real en el ecosistema web: los validadores oficiales de la W3C no siempre reflejan el estado actual de las especificaciones que la misma W3C publica.
+
+---
 
 ### WAVE — pantalla `/pedal`
 
@@ -115,6 +162,8 @@ Se evaluó la pantalla de detección de pedal con WAVE (Web Accessibility Evalua
 
 La única alerta corresponde al elemento `<video>` sin subtítulos (`<track>`), lo cual es técnicamente correcto según WCAG pero no aplica en este contexto: el video es un stream de cámara en vivo, no contenido multimedia con audio. No se agrega una pista de subtítulos porque no hay audio que transcribir.
 
+---
+
 ### Criterios WCAG 2.2 verificados manualmente
 
 | Criterio | Descripción | Resultado |
@@ -129,6 +178,70 @@ La única alerta corresponde al elemento `<video>` sin subtítulos (`<track>`), 
 | 2.4.7 | Foco visible | ✅ Outline visible en todos los elementos focusables |
 | 3.1.1 | Idioma de la página | ✅ `lang="es"` en `<html>` |
 | 4.1.2 | Nombre, función, valor | ✅ Roles y estados ARIA correctos |
+
+---
+
+### Sin JavaScript
+
+Se deshabilitó JavaScript desde Chrome DevTools y se navegaron las tres pantallas principales en la versión desplegada en Vercel.
+
+| Elemento | Resultado |
+|---|---|
+| Navegación principal | ✅ Renderiza correctamente vía SSR |
+| Títulos y descripciones de cada pantalla | ✅ Visibles — Next.js sirve el HTML completo |
+| Botones de ajustes | ⚠️ No responden — requieren event handlers de React |
+| Habilitación de cámara (`/pedal`) | ⚠️ Permanece en estado "Iniciando cámara" — requiere `MediaDevices API` |
+| Habilitación de micrófono (`/afinador`) | ⚠️ No se activa — requiere `Web Audio API` |
+
+El comportamiento es correcto. La app es una PWA que opera sobre APIs de browser (MediaDevices, Web Audio, Web Speech) que son inherentemente dependientes de JavaScript. Sin JS, Next.js entrega el HTML estructural completo vía SSR — títulos, navegación, descripciones — cumpliendo el requisito de contenido útil sin scripts. Las funcionalidades interactivas quedan en su estado inicial, no en una pantalla en blanco.
+
+---
+
+### Sin CSS
+
+Se deshabilitaron todos los estilos desde Firefox (Ver → Estilo de página → Sin estilo) y se navegaron las pantallas principales.
+
+**Resultado: contenido legible y funcional.**
+
+Sin hojas de estilo, la app muestra el HTML estructural en orden lógico: título, descripción, navegación, controles. Los botones e inputs son reconocibles como elementos interactivos nativos del browser. Las funcionalidades (cámara, ajustes) siguen operando porque no dependen de CSS. El contenido no se pierde ni se superpone — la jerarquía semántica del HTML sostiene la legibilidad por sí sola.
+
+Esto es resultado directo de las decisiones de estructura tomadas durante el desarrollo: uso de elementos HTML semánticos (`<main>`, `<nav>`, `<header>`, `<button>`) en lugar de `<div>` genéricos, y un orden de nodos en el DOM que refleja el flujo lógico de la pantalla.
+
+---
+
+### Diferentes navegadores
+
+Se probó la app en cuatro navegadores distintos, verificando layout, navegación por teclado y funcionamiento de las APIs de browser (cámara, micrófono, TTS).
+
+| Navegador | Motor | Resultado |
+|---|---|---|
+| Chrome | Blink | ✅ Referencia base — funciona correctamente |
+| Brave | Blink | ✅ Funciona correctamente |
+| Edge | Blink | ✅ Funciona correctamente |
+| Firefox | Gecko | ✅ Funciona correctamente |
+
+El comportamiento es consistente en todos los navegadores probados. Las APIs utilizadas (MediaDevices, Web Audio, Web Speech) tienen soporte completo en motores Blink y Gecko modernos.
+
+---
+
+### Diferentes resoluciones
+
+Se probó el layout en distintas resoluciones usando Chrome DevTools (modo responsive).
+
+| Resolución | Dispositivo | Resultado |
+|---|---|---|
+| 375×667 | iPhone SE | ✅ Funcional — con excepción nota abajo |
+| 390×844 | iPhone 14 | ✅ Funciona correctamente |
+| 1280×800 | Laptop | ✅ Funciona correctamente |
+| 1920×1080 | Desktop | ✅ Funciona correctamente |
+
+**Observación — fuente muy grande en pantalla pequeña:**
+
+En iPhone SE (375px de ancho) con la fuente configurada en tamaño muy grande desde `/ajustes`, algunos elementos desbordan la pantalla. Este es el único caso de overflow detectado, y se da en la combinación del dispositivo más pequeño con la opción de fuente más grande.
+
+Vale notar que el usuario objetivo de la opción de fuente muy grande es alguien con baja visión, que probablemente use el teléfono con zoom del sistema operativo activo — lo que ya implica scroll horizontal. En todos los demás tamaños de dispositivo y configuraciones de fuente, el layout es correcto.
+
+---
 
 ### Prueba con TalkBack (Android)
 
@@ -145,7 +258,33 @@ Todo el flujo es operable sin exploración visual de la pantalla.
 
 ---
 
-## 6. Conclusiones
+# Parte 2 — Desarrollo
+
+---
+
+## 2.1 Descripción del proyecto
+
+Eco nació de una observación simple: la mayoría de las herramientas musicales digitales asumen que quien las usa puede ver la pantalla. Para un músico ciego o con baja visión, eso significa que un afinador de guitarra, una app de partituras o un identificador de pedales son básicamente inutilizables. Eco intenta resolver eso.
+
+El sistema cubre cuatro funciones: afinar un instrumento con feedback hablado, leer partituras mediante reconocimiento óptico, identificar pedales de efectos usando la cámara, y personalizar la experiencia visual y auditiva. Todo operado por voz, teclado o lector de pantalla.
+
+Está construido sobre Next.js 15, TypeScript y Tailwind CSS. Para las funciones de cámara, voz y audio se usan las APIs nativas del navegador — MediaDevices, Web Speech API y AudioContext — sin librerías externas.
+
+---
+
+## 2.2 Estado de la versión inicial
+
+| Pantalla | Estado |
+|---|---|
+| Ajustes (`/ajustes`) | ✅ Completo |
+| Detectar pedal (`/pedal`) | ✅ Completo (detección mock) |
+| Leer partitura (`/partitura`) | 🚧 UI e integración backend implementadas — OCR sin validar en producción |
+| Afinador (`/afinador`) | 🚧 Estructura definida, lógica pendiente |
+| Metrónomo (`/partitura/metronomo`) | 🚧 Estructura definida, lógica pendiente |
+
+---
+
+## 2.3 Conclusiones
 
 La versión inicial demuestra que es posible construir herramientas musicales que funcionen igual de bien para un usuario ciego que para uno con visión. La pantalla de pedal es el ejemplo más claro: guía al usuario a través de una tarea de visión — apuntar la cámara a un objeto físico — sin requerir ninguna exploración visual, y obtiene la máxima puntuación en la evaluación de accesibilidad.
 

@@ -14,3 +14,4 @@ Cuando generes documentación técnica que no sea uno de los docs canónicos de 
 | --- | --- |
 | [`INFRASTRUCTURE.md`](./INFRASTRUCTURE.md) | Infraestructura base inicializada: versiones del stack, estructura de archivos, configuración (Serwist, ESLint, Prettier, TS), estado global/tema/navegación, Docker y gates de verificación. |
 | [`COLORS.md`](./COLORS.md) | Sistema de colores: paleta completa (4 temas), ratios de contraste WCAG, decisiones de ajuste respecto al Figma, reglas de uso. |
+| [`VALIDACIONES-MANUALES.md`](./VALIDACIONES-MANUALES.md) | Checklist paso a paso de las 6 validaciones manuales requeridas por el enunciado: HTML W3C, CSS W3C, sin JS, sin CSS, navegadores, resoluciones. |

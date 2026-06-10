@@ -86,27 +86,7 @@ export default function AfinadorScreen() {
 
   return (
     <div className="flex flex-col items-center gap-10 px-4 py-8">
-      <TunerDisplay
-        detectedNote={detectedNote}
-        status={status}
-        activeStringIndex={activeStringIndex}
-        selectedStringIndex={selectedStringIndex}
-        onSelectString={setSelectedStringIndex}
-      />
-
-      <PitchIndicator cents={detectedNote?.cents ?? 0} status={status} />
-
       <div className="flex flex-wrap justify-center gap-3">
-        <Button
-          onPress={toggle}
-          aria-pressed={!isListening}
-          aria-label={isListening ? 'Pausar micrófono' : 'Reanudar micrófono'}
-          className={BTN}
-        >
-          {isListening ? <PauseIcon /> : <PlayIcon />}
-          {isListening ? 'Pausar' : 'Reanudar'}
-        </Button>
-
         <Button
           onPress={() => setTtsEnabled((v) => !v)}
           aria-pressed={!ttsEnabled}
@@ -116,7 +96,27 @@ export default function AfinadorScreen() {
           {ttsEnabled ? <SpeakerOnIcon /> : <SpeakerOffIcon />}
           Narrador
         </Button>
+
+        <Button
+          onPress={toggle}
+          aria-pressed={!isListening}
+          aria-label={isListening ? 'Pausar micrófono' : 'Reanudar micrófono'}
+          className={BTN}
+        >
+          {isListening ? <PauseIcon /> : <PlayIcon />}
+          {isListening ? 'Pausar' : 'Reanudar'}
+        </Button>
       </div>
+
+      <TunerDisplay
+        detectedNote={detectedNote}
+        status={status}
+        activeStringIndex={activeStringIndex}
+        selectedStringIndex={selectedStringIndex}
+        onSelectString={setSelectedStringIndex}
+      />
+
+      <PitchIndicator cents={detectedNote?.cents ?? 0} status={status} />
 
       {devices.length > 1 && (
         <div className="hidden w-full max-w-xs flex-col gap-1 md:flex">
