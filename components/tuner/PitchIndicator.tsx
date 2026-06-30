@@ -2,7 +2,7 @@
 
 // Accesibilidad: el componente es puramente visual (aria-hidden).
 // La magnitud de la desviación llega al usuario que no ve por el canal único de audio
-// (incluida en `announcement` de useTuner: "Mi. 12 centavos alto."), no por esta barra.
+// (incluida en `announcement` de useTuner: "Mi. Medianamente alto."), no por esta barra.
 
 import type { TuningStatus } from '@/hooks/useTuner'
 

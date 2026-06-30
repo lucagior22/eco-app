@@ -39,6 +39,19 @@ const LOWPASS_HZ = 1000
 const JUMP_THRESHOLD_CENTS = 200
 const EMA_ALPHA = 0.4
 
+const DEVIATION_MEDIUM_CENTS = 25
+const DEVIATION_STRONG_CENTS = 45
+
+function deviationSuffix(cents: number): string {
+  const magnitude =
+    Math.abs(cents) >= DEVIATION_STRONG_CENTS
+      ? 'Muy'
+      : Math.abs(cents) >= DEVIATION_MEDIUM_CENTS
+        ? 'Medianamente'
+        : 'Un poco'
+  return `${magnitude} ${cents > 0 ? 'alto' : 'bajo'}.`
+}
+
 export function useTuner(
   stream: MediaStream | null,
   ttsSpeed: EcoSettings['ttsSpeed'],
@@ -208,8 +221,7 @@ export function useTuner(
         // sostiene afinado; el cooldown sigue limitando los avisos de "un poco alto/bajo".
         if (statusChanged && (cooldownOk || newStatus === 'tuned')) {
           const nameEs = NOTE_NAMES_ES[targetNote.note] ?? targetNote.note
-          const suffix =
-            newStatus === 'tuned' ? 'Afinado.' : newStatus === 'high' ? 'Un poco alto.' : 'Un poco bajo.'
+          const suffix = newStatus === 'tuned' ? 'Afinado.' : deviationSuffix(cents)
           const text = `${nameEs}. ${suffix}`
           if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
           setAnnouncement(text)
@@ -272,8 +284,7 @@ export function useTuner(
 
       if (changed && (cooldownOk || newStatus === 'tuned')) {
         const nameEs = NOTE_NAMES_ES[refString.label] ?? refString.label
-        const suffix =
-          newStatus === 'tuned' ? 'Afinado.' : newStatus === 'high' ? 'Un poco alto.' : 'Un poco bajo.'
+        const suffix = newStatus === 'tuned' ? 'Afinado.' : deviationSuffix(centsFromString)
         const text = `${nameEs}. ${suffix}`
         if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
         setAnnouncement(text)
