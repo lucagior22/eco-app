@@ -132,6 +132,8 @@ Este proyecto es un TFI académico. La documentación sirve de evidencia del pro
 | `claude-docs/INFRASTRUCTURE.md` | Documentación de la infraestructura base: versiones, estructura, config de tooling, Docker, gates. |
 | `claude-docs/COLORS.md` | Sistema de colores: paleta de los 4 temas, ratios WCAG, decisiones de ajuste vs Figma. |
 | `claude-docs/VALIDACIONES-MANUALES.md` | Checklist paso a paso de las 6 validaciones manuales requeridas por el enunciado del TFI. |
+| `claude-docs/AFINADOR.md` | Funcionamiento técnico de `/afinador`: stack, pipeline de audio, YIN y thresholds, suavizado, modos y narración TTS. |
+| `claude-docs/EVAL-AFINADOR.md` | Evaluación heurística crítica de `/afinador`: hallazgos de accesibilidad y diseño/UX priorizados con evidencia archivo:línea. |
 
 ### Carpeta `claude-docs/`
 

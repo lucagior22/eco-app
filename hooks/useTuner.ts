@@ -6,6 +6,7 @@ import {
   frequencyToNote,
   closestStringIndex,
   centsToTarget,
+  correctOctave,
   GUITAR_STRINGS,
   NOTE_NAMES_ES,
 } from '@/lib/pitch'
@@ -28,7 +29,12 @@ const CENTS_THRESHOLD_STAY = 20
 const TTS_COOLDOWN_MS = 3000
 const FFT_SIZE = 4096
 const HOLD_MS = 2000
-const MEDIAN_WINDOW = 3
+const MEDIAN_WINDOW = 5
+// Band-pass: las fundamentales de cuerda al aire van de E2 (82 Hz) a E4 (330 Hz).
+// Highpass corta rumble/DC por debajo de E2; lowpass atenúa armónicos y siseo para que
+// YIN bloquee mejor la fundamental (deja margen para notas con traste).
+const HIGHPASS_HZ = 65
+const LOWPASS_HZ = 1000
 const JUMP_THRESHOLD_CENTS = 200
 const EMA_ALPHA = 0.4
 
@@ -56,6 +62,23 @@ export function useTuner(
   const isSpeakingRef = useRef(false)
   const nullCountRef = useRef(0)
   const smoothedFreqRef = useRef<number | null>(null)
+  const speechGenRef = useRef(0)
+
+  // Centraliza el patrón de locución y resuelve el bug del narrador auto-escuchado:
+  // cada locución toma un `gen`; el onEnd solo apaga el guard si sigue siendo la vigente,
+  // así un callback de una locución cancelada (al cambiar de modo) no reactiva la
+  // detección en medio de la siguiente. El colchón de 300 ms absorbe la cola acústica.
+  const announce = useCallback((text: string) => {
+    const gen = ++speechGenRef.current
+    isSpeakingRef.current = true
+    speak(text, ttsSpeedRef.current, () => {
+      setTimeout(() => {
+        if (gen !== speechGenRef.current) return
+        isSpeakingRef.current = false
+        freqHistoryRef.current = []
+      }, 300)
+    })
+  }, [])
 
   useEffect(() => { ttsEnabledRef.current = ttsEnabled }, [ttsEnabled])
   useEffect(() => { ttsSpeedRef.current = ttsSpeed }, [ttsSpeed])
@@ -67,17 +90,12 @@ export function useTuner(
     committedStatusRef.current = 'silent'
 
     if (ttsEnabledRef.current) {
-      cancelSpeech()
-      isSpeakingRef.current = true
       const text = targetStringIndex === null
         ? 'Modo automático'
         : `Afinando ${NOTE_NAMES_ES[GUITAR_STRINGS[targetStringIndex].label] ?? GUITAR_STRINGS[targetStringIndex].label}`
-      speak(text, ttsSpeedRef.current, () => {
-        isSpeakingRef.current = false
-        freqHistoryRef.current = []
-      })
+      announce(text)
     }
-  }, [targetStringIndex])
+  }, [targetStringIndex, announce])
 
   useEffect(() => {
     isListeningRef.current = isListening
@@ -102,12 +120,22 @@ export function useTuner(
     void ctx.resume()
 
     const source = ctx.createMediaStreamSource(stream)
+
+    const highpass = ctx.createBiquadFilter()
+    highpass.type = 'highpass'
+    highpass.frequency.value = HIGHPASS_HZ
+    const lowpass = ctx.createBiquadFilter()
+    lowpass.type = 'lowpass'
+    lowpass.frequency.value = LOWPASS_HZ
+
     const analyser = ctx.createAnalyser()
     analyser.fftSize = FFT_SIZE
 
     const silentGain = ctx.createGain()
     silentGain.gain.value = 0
-    source.connect(analyser)
+    source.connect(highpass)
+    highpass.connect(lowpass)
+    lowpass.connect(analyser)
     analyser.connect(silentGain)
     silentGain.connect(ctx.destination)
 
@@ -170,14 +198,8 @@ export function useTuner(
           const nameEs = NOTE_NAMES_ES[targetNote.note] ?? targetNote.note
           const suffix =
             newStatus === 'tuned' ? 'Afinado.' : newStatus === 'high' ? 'Un poco alto.' : 'Un poco bajo.'
-          isSpeakingRef.current = true
           if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-          speak(`${nameEs}. ${suffix}`, ttsSpeedRef.current, () => {
-            setTimeout(() => {
-              isSpeakingRef.current = false
-              freqHistoryRef.current = []
-            }, 300)
-          })
+          announce(`${nameEs}. ${suffix}`)
           lastTtsTimeRef.current = now
           lastNoteKeyRef.current = `${targetNote.note}${targetNote.octave}`
           lastStatusRef.current = newStatus
@@ -185,19 +207,8 @@ export function useTuner(
         return
       }
 
-      // Modo automático: filtro de mediana sobre historial de frecuencias
-
-      // Corrección de subarmónicos: YIN puede detectar E4/2 ≈ 165 Hz (→ D3) o E4/3 ≈ 110 Hz (→ A2)
-      // en lugar de la fundamental. Si doblar la frecuencia da un match más cercano a una cuerda, usarlo.
-      let correctedFreq = rawFreq
-      const doubled = rawFreq * 2
-      if (doubled <= 1600) {
-        const rawIdx = closestStringIndex(rawFreq)
-        const doubledIdx = closestStringIndex(doubled)
-        const rawCents = Math.abs(1200 * Math.log2(rawFreq / GUITAR_STRINGS[rawIdx].frequency))
-        const doubledCents = Math.abs(1200 * Math.log2(doubled / GUITAR_STRINGS[doubledIdx].frequency))
-        if (doubledCents < rawCents) correctedFreq = doubled
-      }
+      // Modo automático: corrección de octava (subarmónico/armónico) + mediana sobre historial.
+      const correctedFreq = correctOctave(rawFreq)
 
       const history = freqHistoryRef.current
       if (history.length > 0) {
@@ -249,14 +260,8 @@ export function useTuner(
         const nameEs = NOTE_NAMES_ES[refString.label] ?? refString.label
         const suffix =
           newStatus === 'tuned' ? 'Afinado.' : newStatus === 'high' ? 'Un poco alto.' : 'Un poco bajo.'
-        isSpeakingRef.current = true
         if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-        speak(`${nameEs}. ${suffix}`, ttsSpeedRef.current, () => {
-          setTimeout(() => {
-            isSpeakingRef.current = false
-            freqHistoryRef.current = []
-          }, 300)
-        })
+        announce(`${nameEs}. ${suffix}`)
         lastTtsTimeRef.current = now
         lastNoteKeyRef.current = noteKey
         lastStatusRef.current = newStatus
@@ -271,10 +276,12 @@ export function useTuner(
       if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
       silentGain.disconnect()
       analyser.disconnect()
+      lowpass.disconnect()
+      highpass.disconnect()
       source.disconnect()
       void ctx.close()
     }
-  }, [stream])
+  }, [stream, announce])
 
   const toggle = useCallback(() => {
     setIsListening((prev) => !prev)

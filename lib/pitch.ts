@@ -48,12 +48,39 @@ export function detectPitch(buffer: Float32Array, sampleRate: number): number | 
   if (sampleRate !== lastSampleRate || !yinDetector) {
     // threshold 0.15: más permisivo que el default (0.1), mejora la detección
     // de E2 (82 Hz) cuya señal es más débil y tiene más ruido de arco.
+    // No se aplica ventana (Hann): YIN es un método de dominio temporal basado en la
+    // función de diferencia; enventanar atenúa los bordes y rompe la periodicidad,
+    // impidiendo que la diferencia baje del umbral (devolvería null en cada frame).
     yinDetector = YIN({ sampleRate, threshold: 0.15 })
     lastSampleRate = sampleRate
   }
   const freq = yinDetector(buffer)
   if (!freq || freq < 50 || freq > 1600) return null
   return freq
+}
+
+/**
+ * Corrige errores de octava de YIN: a veces detecta un subarmónico (freq/2) o el primer
+ * armónico (freq×2) en lugar de la fundamental. Evalúa {÷2, ×1, ×2} contra las cuerdas
+ * de la guitarra y devuelve el candidato más cercano a alguna cuerda. Se compara contra
+ * las cuerdas (no contra la escala cromática) porque las octavas son cromáticamente
+ * equivalentes: una nota afinada tendría sus octavas igual de "afinadas" y el criterio
+ * cromático elegiría siempre la más grave. Las 6 cuerdas no están espaciadas en octavas,
+ * así que una octava errónea cae lejos de todas y se descarta.
+ */
+export function correctOctave(freq: number): number {
+  const candidates = [freq / 2, freq, freq * 2].filter((f) => f >= 50 && f <= 1600)
+  let best = freq
+  let bestCents = Infinity
+  for (const f of candidates) {
+    const idx = closestStringIndex(f)
+    const cents = Math.abs(1200 * Math.log2(f / GUITAR_STRINGS[idx].frequency))
+    if (cents < bestCents) {
+      bestCents = cents
+      best = f
+    }
+  }
+  return best
 }
 
 export function frequencyToNote(frequency: number): DetectedNote {
