@@ -43,3 +43,6 @@ next-env.d.ts
 # serwist — archivos generados en build
 public/sw*
 public/swe-worker*
+
+# fotos de prueba locales (calibración de scripts/detect_knobs.py)
+/tmp/

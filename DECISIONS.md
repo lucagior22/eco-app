@@ -137,3 +137,62 @@ Sin pausa, el audio del TTS es captado por el micrófono. YIN interpreta la señ
 
 **Razones:**
 Es la versión scaffoldeada por `create-next-app` al momento de inicializar el proyecto. La configuración CSS-first de v4 (`@import "tailwindcss"` en globals.css) elimina el archivo de configuración JS y reduce fricción. No hay razón para degradar a v3.
+
+---
+
+## 2026-06-30 — Detección genérica de perillas (no identificación de modelo de pedal)
+
+**Decisión:** `/pedal` v2 detecta únicamente la posición de las perillas (knobs) circulares en la foto, vía OpenCV (`HoughCircles` + análisis de contraste angular en `scripts/detect_knobs.py`), sin intentar identificar la marca/modelo del pedal ni leer texto o logos en la imagen. La detección del estado del LED también queda fuera de esta iteración.
+
+**Razones:**
+Identificar el modelo de un pedal a partir de una foto requeriría clasificación de imágenes (un modelo entrenado contra un dataset de pedales conocidos) u OCR de logos, ninguno de los cuales está disponible en el stack actual (OpenCV solo da operaciones clásicas de visión, no clasificación). Construir o entrenar un clasificador está fuera del alcance de tiempo del TFI y requeriría un dataset que no existe. La detección genérica de círculos + ángulo es resoluble con OpenCV puro, no requiere modelos pre-entrenados ni conexión a internet, y resuelve el problema real del usuario ciego: saber en qué posición están las perillas de SU pedal, sin necesitar que el sistema sepa qué pedal es. La detección del LED se excluyó de esta iteración por ser un problema de visión distinto (brillo/color puntual bajo iluminación variable, con alta tasa de falsos positivos) que merece su propio diseño y validación posterior con el pedal físico antes de comprometerse a una implementación.
+
+OpenCV (`opencv-python-headless`) se instala explícito en el Dockerfile en vez de depender de que llegue transitivamente vía `oemer` — ver comentario en el Dockerfile.
+
+---
+
+## 2026-06-30 — Calibración de `detect_knobs.py`: múltiples pasadas de Hough + filtros de brillo y de outliers espaciales
+
+**Decisión:** El algoritmo de `scripts/detect_knobs.py` no usa una sola pasada de `cv2.HoughCircles`, sino tres (sobre la imagen sin ecualizar, con `equalizeHist` y con CLAHE) cuyos resultados se combinan y deduplican por cercanía. Además, cada círculo candidato se filtra por brillo medio (`KNOB_MAX_MEAN`) para descartar partes metálicas/reflectantes, y por distancia al resto del grupo (`drop_spatial_outliers`) para descartar ruido de fondo aislado. El orden de las perillas se calcula por fila (arriba→abajo) y luego columna (izquierda→derecha) en vez de solo por coordenada x.
+
+**Razones:**
+Calibrado contra 9 fotos reales de un pedal físico (TC Electronic Sub'n'up, layout de perillas en grilla 2x2, no en una sola fila). Una sola pasada de Hough con cualquiera de los tres preprocesamientos detecta como máximo 3 de las 4 perillas reales: el contraste de cada perilla varía según el reflejo de luz ambiente en cada foto (glare diagonal sobre el cuerpo del pedal), y ninguna técnica de realce de contraste sola recupera el contraste perdido en todas las zonas a la vez — la unión de las tres sí, en 8 de las 9 fotos de prueba. El footswitch metálico y los jacks producían falsos positivos en la detección de círculos (mismo rango de tamaño que una perilla); el filtro de brillo los descarta porque las perillas de pedal son consistentemente de plástico oscuro. La grilla 2x2 real del pedal de prueba invalidó el supuesto original de "una sola fila, ordenar por x" — ordenar por fila y luego columna es necesario para que la app reporte las perillas en un orden predecible y navegable para un usuario ciego, independientemente del layout físico del pedal fotografiado.
+
+**Limitación conocida:** en 1 de 9 fotos de prueba (encuadre más cercano, mayor parte de la perilla "DRY" fuera del rango de contraste esperado) el algoritmo detectó solo 3 de las 4 perillas reales — degrada de forma controlada (reporta 3 perillas reales, no inventa la cuarta) pero no es 100% confiable en todos los encuadres. Recomendación para el usuario: fotografiar el pedal de frente, con luz pareja y sin reflejos directos sobre las perillas.
+
+---
+
+## 2026-06-30 — Fix: el detector de ángulo enganchaba la sombra de la base del knob en vez de la marca blanca
+
+**Decisión:** `detect_pointer_angle` busca solo excursiones hacia el BRILLO respecto al promedio del knob (`mean(samples) - knob_mean`), no la diferencia absoluta (`abs(mean(samples) - knob_mean)`). Además, la búsqueda recorre una banda de radio ABSOLUTA en píxeles (`POINTER_INNER_R_PX`–`POINTER_OUTER_R_PX`, con una ventana deslizante de `POINTER_WINDOW_PX`) en vez de una fracción del radio que devuelve `cv2.HoughCircles`. El umbral de fusión de detecciones duplicadas (`merge_candidates`) ahora tiene un piso absoluto (`MERGE_DIST_MIN_PX`) además del relativo al radio.
+
+**Razones:**
+Probando con fotos capturadas en vivo desde el celular (no las fotos HDR de calibración original), se detectó que la MISMA perilla física, sin tocar entre tomas consecutivas, daba lecturas de ángulo completamente distintas (ej. 81% vs 25%) — confirmado visualmente comparando crops de la marca blanca en varias fotos: la marca no se había movido. Investigando con visualización de overlay sobre la imagen real, se encontró la causa: estas perillas (cilíndricas, con tope plástico anguloso) tienen una sombra oscura marcada donde la base se junta con el panel del pedal. Esa sombra es, en términos de contraste absoluto contra el brillo medio del knob, tan "saliente" como la marca blanca real — con `abs(diff)` el algoritmo a veces enganchaba la sombra (en la dirección opuesta a la marca real) en vez de la marca, de forma intermitente entre fotos sin patrón aparente. Restringir la búsqueda a solo excursiones de BRILLO (no de oscuridad) resolvió esto, porque la marca indicadora es siempre blanca/clara y la sombra nunca lo es.
+
+Además se confirmó que el radio que entrega `cv2.HoughCircles` para estas perillas es poco confiable (varió de 60 a 102px para la misma perilla física en fotos consecutivas), y como la búsqueda original ataba el anillo de muestreo a ese radio (`r * POINTER_INNER_RATIO` a `r * POINTER_OUTER_RATIO`), un radio mal estimado hacía que la búsqueda mirara la zona equivocada del knob. Usar una banda absoluta en píxeles (calibrada contra el rango real de radios observado en WORK_WIDTH=1000, ~46-110px) hace la detección de ángulo independiente de la precisión del radio de Hough.
+
+**Resultado tras el fix:** de 6 fotos capturadas en vivo (cámara del celular, no las HDR de calibración), 5 dan exactamente 4 perillas detectadas con valores consistentes entre sí; 1 sigue dando una lectura distinta para una perilla (causa: una detección duplicada de Hough que el merge no fusionó correctamente, el más probable próximo punto a mejorar). Sigue siendo una heurística de visión clásica, no perfecta en el 100% de las fotos — la recomendación de fotografiar con buena luz y encuadre derecho sigue aplicando.
+
+---
+
+## 2026-06-30 — Posición de perilla como hora de reloj (1-12), no porcentaje 0-100%
+
+**Decisión:** `scripts/detect_knobs.py` ya no convierte el ángulo medido a un porcentaje 0-100%. En cambio, lo redondea directamente a la hora de reloj más cercana (1 a 12, con 12 = arriba de la imagen) y reporta eso (`angle_to_clock_hour`). Se eliminaron las constantes `SWEEP_START_DEG` y `SWEEP_DEGREES` y toda la lógica de "zona muerta" asociada. El frontend (`PedalInfo`, TTS en `PedalScreen`) narra "a las 3", "a la una", etc. en vez de "al 60 por ciento".
+
+**Razones:**
+Con datos reales aportados por el usuario (perillas en posiciones físicas conocidas: 60%, 55%, 0%, 65%), se confirmó que el algoritmo de ángulo (ya corregido, ver entrada anterior) estaba midiendo la dirección de la marca CORRECTAMENTE — pero la conversión a porcentaje requería saber `SWEEP_START_DEG`: en qué ángulo de la imagen está físicamente el "mínimo" (0%) de la perilla. Ese valor se había asumido de forma genérica (225°) sin calibrarlo contra el pedal real, y la calibración con los datos del usuario reveló que el verdadero punto de partida estaba a ~90-95° de distancia de lo asumido — explicando por qué una perilla en 0% se leía como ~99%, casi el extremo opuesto.
+
+Calibrar `SWEEP_START_DEG`/`SWEEP_DEGREES` correctamente requeriría fotos de referencia con cada perilla en posiciones conocidas (mínimo, máximo, intermedio) — viable pero fragante a re-calibración por cada modelo de pedal distinto, porque cada perilla puede empezar y terminar en un punto distinto de la circunferencia según el fabricante. La hora de reloj evita el problema de raíz: no necesita saber dónde está el "mínimo" de nada, solo reporta hacia dónde apunta la marca, igual que ya hacen los músicos en la jerga real ("la perilla está a las 3"). Validado contra las fotos en vivo: la perilla que el usuario confirmó en 0% pasó a leerse consistentemente "a las 7" en 5 de 6 fotos (antes oscilaba entre 81% y 25% sin patrón); la perilla en 65% se leyó consistentemente "a las 4" o "a las 5" en 3 de 4 fotos disponibles.
+
+**Limitación que persiste:** la hora de reloj sigue asumiendo que el celular se sostiene razonablemente derecho (sin inclinación/roll grande), porque "las 12" se define como "arriba de la imagen". Es un supuesto mucho más liviano que el anterior (no depende del modelo de pedal, solo de cómo se sostiene el teléfono), pero no corrige inclinación de cámara entre fotos — eso quedaría para una iteración futura si hace falta (ej. usando la orientación real del cuerpo del pedal en la foto, detectada por contorno, en vez de "arriba de la imagen").
+
+---
+
+## 2026-06-30 — Reintento a mayor resolución de trabajo si se detectan pocas perillas (en vez de bajar el radio mínimo de Hough)
+
+**Decisión:** `scripts/detect_knobs.py` corre el pipeline de detección a `WORK_WIDTH_BASE=1000` primero; si detecta menos de 3 perillas, lo reintenta completo a `WORK_WIDTH_FALLBACK=1800` y usa ese resultado si encontró más. No se bajó `HOUGH_MIN_RADIUS` (quedó en 40) para cubrir fotos tomadas más lejos del pedal.
+
+**Razones:**
+El usuario reportó que, en un lote de fotos en vivo, varias daban 0-1 perillas detectadas (antes funcionaba mejor). Comparando esas fotos contra las anteriores, la diferencia no era el flash (recién agregado) sino que el pedal ocupaba una porción mucho más chica del cuadro — las perillas tenían un radio real de ~31px en WORK_WIDTH=1000, muy por debajo del rango calibrado (40-120px), así que Hough directamente no las encontraba. Bajar `HOUGH_MIN_RADIUS` a 18 para cubrirlas SÍ detectaba esas perillas, pero introdujo regresión en fotos de cerca ya validadas: el selector LED pequeño del pedal ("POLY/TONEPRINT/CLASSIC") y otros círculos chicos de ruido empezaban a pasar el filtro, dando 5-6 "perillas" en vez de 4 en fotos que antes daban exactamente 4. Mantener el radio mínimo fijo y en cambio agrandar la imagen de trabajo cuando hace falta logra el mismo efecto (las perillas lejanas "crecen" hasta el rango esperado) sin ensuciar el caso de cerca, que sigue corriendo con los parámetros ya validados sin tocar.
+
+**Resultado:** sobre 55 fotos reales en vivo (3 sesiones de prueba distintas, incluyendo luz dura con sombras de persiana y encuadres lejanos), 53 detectan 3 o más perillas (96%), contra una proporción mucho menor antes del fallback. El set de calibración original (9 fotos de cerca) no tuvo regresión — siguen usando `WORK_WIDTH_BASE` sin activar el fallback.

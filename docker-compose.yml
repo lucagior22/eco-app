@@ -6,3 +6,9 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+    volumes:
+      # Debug temporal: para inspeccionar las fotos reales que captura la
+      # cámara en vivo y diagnosticar /pedal. Sacar cuando se resuelva.
+      # :z relabela el directorio para SELinux (Fedora en modo Enforcing
+      # bloquea el acceso del contenedor sin esto, incluso con permisos Unix ok).
+      - ./tmp/debug_captures:/app/tmp/debug_captures:z

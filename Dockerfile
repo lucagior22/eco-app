@@ -38,6 +38,14 @@ RUN pip3 install --no-cache-dir --break-system-packages oemer
 # No se hace aquí porque alarga el build y aumenta el tamaño de la imagen sin
 # beneficio claro en desarrollo. Documentado en DECISIONS.md.
 
+# opencv-python-headless y numpy: usados por scripts/detect_knobs.py (detección
+# de perillas de pedal, ver /api/pedal/detect). Ya llegan transitivamente como
+# dependencias de oemer, pero se declaran explícitas para no depender de una
+# dependencia transitiva de un paquete de terceros: si una futura versión de
+# oemer deja de necesitarlas, el build de detect_knobs.py se rompería sin que
+# el cambio sea visible en este Dockerfile.
+RUN pip3 install --no-cache-dir --break-system-packages opencv-python-headless numpy
+
 WORKDIR /app
 
 COPY package*.json ./
