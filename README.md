@@ -9,7 +9,7 @@ PWA para músicos con discapacidad visual: afinador, lector de partituras, metr�
 | Afinador       | `/afinador`            | ✅ Completo     |
 | Leer partitura | `/partitura`           | ⬜ Pendiente    |
 | Metrónomo      | `/partitura/metronomo` | ⬜ Pendiente    |
-| Detectar pedal | `/pedal`               | ⬜ Pendiente    |
+| Detectar pedal | `/pedal`               | 🚧 En progreso  |
 | Ajustes        | `/ajustes`             | ⬜ Pendiente    |
 
 ## Stack
