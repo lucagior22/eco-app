@@ -1,49 +1,35 @@
-// Accesibilidad: los parámetros del pedal (Tone, Level, Distorsión) se presentan
-// en una <dl> semántica. El estado del LED incluye texto explícito además del
-// color para no depender del color como único diferenciador de estado (§ CLAUDE.md).
+// Accesibilidad: las perillas detectadas se presentan en una <dl> semántica.
+// v2 no identifica modelo de pedal ni estado de LED (fuera de alcance) —
+// solo reporta la posición de cada perilla detectada genéricamente, expresada
+// como hora de reloj (1-12, jerga común entre músicos) en vez de porcentaje:
+// no requiere saber dónde está el "mínimo" o "máximo" de cada perilla.
 
-interface PedalData {
-  name: string
-  params: { label: string; value: number }[]
-  led: 'on' | 'off'
+import { clockHourToSpanish } from '@/lib/clock'
+
+export interface Knob {
+  label: string
+  value: number
 }
 
-// Datos fijos para v1. La interfaz acepta datos dinámicos para facilitar v2.
-const MOCK_PEDAL: PedalData = {
-  name: 'BOSS DS-1',
-  params: [
-    { label: 'Tone', value: 50 },
-    { label: 'Level', value: 50 },
-    { label: 'Distorsión', value: 50 },
-  ],
-  led: 'off',
+interface PedalInfoProps {
+  knobs: Knob[]
 }
 
-export default function PedalInfo() {
-  const pedal = MOCK_PEDAL
-
+export default function PedalInfo({ knobs }: PedalInfoProps) {
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-      <h2 className="mb-4 text-xl font-bold text-[var(--color-text-primary)]">{pedal.name}</h2>
+      <h2 className="mb-4 text-xl font-bold text-[var(--color-text-primary)]">
+        {knobs.length} {knobs.length === 1 ? 'perilla detectada' : 'perillas detectadas'}
+      </h2>
       <dl className="grid grid-cols-2 gap-4">
-        {pedal.params.map(({ label, value }) => (
+        {knobs.map(({ label, value }) => (
           <div key={label}>
             <dt className="text-sm text-[var(--color-text-secondary)]">{label}</dt>
-            <dd className="text-2xl font-bold text-[var(--color-text-primary)]">{value}%</dd>
+            <dd className="text-2xl font-bold text-[var(--color-text-primary)] capitalize">
+              {clockHourToSpanish(value)}
+            </dd>
           </div>
         ))}
-        <div>
-          <dt className="text-sm text-[var(--color-text-secondary)]">LED</dt>
-          <dd className="flex items-center gap-2">
-            <span
-              aria-hidden="true"
-              className={`inline-block h-3 w-3 rounded-full ${pedal.led === 'on' ? 'bg-green-500' : 'bg-red-500'}`}
-            />
-            <span className="font-semibold text-[var(--color-text-primary)]">
-              {pedal.led === 'on' ? 'Encendido' : 'Apagado'}
-            </span>
-          </dd>
-        </div>
       </dl>
     </div>
   )
