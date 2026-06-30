@@ -4,9 +4,17 @@ import { useState } from 'react'
 import { useSettings } from '@/contexts/SettingsContext'
 import { useMicrophone } from '@/hooks/useMicrophone'
 import { useTuner } from '@/hooks/useTuner'
+import type { TuningStatus } from '@/hooks/useTuner'
 import TunerDisplay from '@/components/tuner/TunerDisplay'
 import PitchIndicator from '@/components/tuner/PitchIndicator'
 import { Button } from 'react-aria-components'
+
+function getTintColor(status: TuningStatus, cents: number, listening: boolean): string {
+  if (!listening || status === 'silent') return 'transparent'
+  const ratio = Math.min(Math.abs(cents) / 50, 1)
+  const hue = Math.round(120 * (1 - ratio))
+  return `hsla(${hue}, 90%, 40%, 0.35)`
+}
 
 const BTN = 'flex min-w-[160px] items-center justify-center gap-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-3 font-medium text-[var(--color-text-primary)] pressed:opacity-70 focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-[var(--color-focus)]'
 
@@ -85,16 +93,23 @@ export default function AfinadorScreen() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-10 px-4 py-8">
-      <TunerDisplay
-        detectedNote={detectedNote}
-        status={status}
-        activeStringIndex={activeStringIndex}
-        selectedStringIndex={selectedStringIndex}
-        onSelectString={setSelectedStringIndex}
-      />
+    <div
+      className="flex flex-1 flex-col items-center gap-10 px-4 py-8 transition-[background-color] duration-300"
+      style={{ backgroundColor: getTintColor(status, detectedNote?.cents ?? 0, isListening) }}
+    >
+      <div className="w-full max-w-sm rounded-3xl bg-[var(--color-surface)] p-6">
+        <TunerDisplay
+          detectedNote={detectedNote}
+          status={status}
+          activeStringIndex={activeStringIndex}
+          selectedStringIndex={selectedStringIndex}
+          onSelectString={setSelectedStringIndex}
+        />
+      </div>
 
-      <PitchIndicator cents={detectedNote?.cents ?? 0} status={status} />
+      <div className="w-full max-w-sm rounded-3xl bg-[var(--color-surface)] p-6">
+        <PitchIndicator cents={detectedNote?.cents ?? 0} status={status} />
+      </div>
 
       <div className="flex flex-wrap justify-center gap-3">
         <Button

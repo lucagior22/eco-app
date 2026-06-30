@@ -65,6 +65,18 @@ export function useTuner(
     smoothedFreqRef.current = null
     nullCountRef.current = 0
     committedStatusRef.current = 'silent'
+
+    if (ttsEnabledRef.current) {
+      cancelSpeech()
+      isSpeakingRef.current = true
+      const text = targetStringIndex === null
+        ? 'Modo automático'
+        : `Afinando ${NOTE_NAMES_ES[GUITAR_STRINGS[targetStringIndex].label] ?? GUITAR_STRINGS[targetStringIndex].label}`
+      speak(text, ttsSpeedRef.current, () => {
+        isSpeakingRef.current = false
+        freqHistoryRef.current = []
+      })
+    }
   }, [targetStringIndex])
 
   useEffect(() => {
