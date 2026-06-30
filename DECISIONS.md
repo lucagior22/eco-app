@@ -86,6 +86,15 @@ Evita costos de nube (VPS, CDN). Cloudflare Tunnel provee HTTPS, protección DDo
 
 ---
 
+## 2026-06-30 — Deployment en Railway (free) sobre el Dockerfile existente
+
+**Decisión:** La app se hostea en Railway (plan free), que construye y corre el `Dockerfile` del repo directamente. Esto reemplaza, como entorno de hosting principal, el esquema previo de Docker sobre Ubuntu Server local + Cloudflare Tunnel (ver entrada del 2026-06-01).
+
+**Razones:**
+Railway detecta y usa el `Dockerfile` del proyecto sin configuración extra, así que toda la imagen que ya teníamos (Debian bookworm + Python + oemer + OpenCV) corre tal cual en la plataforma. Esto es precisamente lo que hace viable el deployment: el trabajo ya invertido en que la app funcione dentro de Docker se aprovecha directamente, sin reescribir el empaquetado para un buildpack ni para un runtime específico de la nube. El plan free evita costos para el caso de uso académico/demo y provee HTTPS y dominio público sin necesidad de mantener un túnel ni un servidor propio encendido.
+
+---
+
 ## 2026-06-05 — Afinador: AnalyserNode + requestAnimationFrame (no ScriptProcessorNode)
 
 **Decisión:** La captura de audio usa `AnalyserNode` + `getFloatTimeDomainData` en un loop `requestAnimationFrame`, no `ScriptProcessorNode` ni `AudioWorklet`.
