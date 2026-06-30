@@ -14,6 +14,7 @@ export interface UseMicrophoneResult {
   devices: MicDevice[]
   selectedDeviceId: string
   selectDevice: (deviceId: string) => void
+  retry: () => void
 }
 
 export function useMicrophone(): UseMicrophoneResult {
@@ -84,5 +85,9 @@ export function useMicrophone(): UseMicrophoneResult {
     [openStream],
   )
 
-  return { stream, isActive, error, devices, selectedDeviceId, selectDevice }
+  const retry = useCallback(() => {
+    openStream(selectedDeviceId || undefined)
+  }, [openStream, selectedDeviceId])
+
+  return { stream, isActive, error, devices, selectedDeviceId, selectDevice, retry }
 }

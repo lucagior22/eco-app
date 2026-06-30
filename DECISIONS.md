@@ -137,3 +137,12 @@ Sin pausa, el audio del TTS es captado por el micrófono. YIN interpreta la señ
 
 **Razones:**
 Es la versión scaffoldeada por `create-next-app` al momento de inicializar el proyecto. La configuración CSS-first de v4 (`@import "tailwindcss"` en globals.css) elimina el archivo de configuración JS y reduce fricción. No hay razón para degradar a v3.
+
+---
+
+## 2026-06-30 — Afinador: canal único de audio (TTS primario + aria-live fallback)
+
+**Decisión:** El feedback al usuario que no ve viaja por un solo canal coherente. `useTuner` es la fuente única del texto a anunciar (`announcement`), gobernada por la misma lógica de cambio-significativo + cooldown de 3 s que el TTS. El TTS propio de la app es el canal primario; la región `aria-live` (única, `role="status"` y `sr-only` en `AfinadorScreen`) actúa como fallback y queda en `off` cuando el narrador está activo y el navegador soporta Web Speech, o en `polite` en caso contrario. El bloque visual de `TunerDisplay` deja de ser `aria-live`. El anuncio incluye la magnitud de la desviación ("Mi. 12 centavos alto.").
+
+**Razones:**
+Antes la app hablaba dos veces en paralelo: el TTS de `useTuner` y la región `aria-live` de `TunerDisplay`, que el lector de pantalla también vocalizaba, sin coordinación ni throttling en la segunda (se actualizaba en cada frame). Para un usuario ciego con VoiceOver/NVDA esto producía eco y verborrea constante. Centralizar el texto en `announcement` y conmutar `aria-live` según `ttsEnabled`/`isTtsSupported` elimina el solapamiento, hereda el throttling del TTS, y garantiza que siempre haya exactamente un canal hablando (incluso si el narrador se silencia o el navegador no soporta Web Speech). Incluir el número de cents cumple la intención de `SPECIFICATION.md:220`: sin la magnitud audible, afinar fino sin ver es imposible.

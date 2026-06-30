@@ -21,6 +21,7 @@ export interface TunerState {
   status: TuningStatus
   activeStringIndex: number | null
   isListening: boolean
+  announcement: string
   toggle: () => void
 }
 
@@ -48,6 +49,7 @@ export function useTuner(
   const [status, setStatus] = useState<TuningStatus>('silent')
   const [activeStringIndex, setActiveStringIndex] = useState<number | null>(null)
   const [isListening, setIsListening] = useState(true)
+  const [announcement, setAnnouncement] = useState('')
 
   const isListeningRef = useRef(true)
   const ttsEnabledRef = useRef(ttsEnabled)
@@ -64,7 +66,9 @@ export function useTuner(
   const smoothedFreqRef = useRef<number | null>(null)
   const speechGenRef = useRef(0)
 
-  // Centraliza el patrón de locución y resuelve el bug del narrador auto-escuchado:
+  // Locución por el TTS propio de la app (canal primario). El texto a anunciar se decide
+  // antes y se publica también en `announcement` (canal de fallback aria-live); `announce`
+  // solo habla cuando el narrador está activo. Resuelve el bug del narrador auto-escuchado:
   // cada locución toma un `gen`; el onEnd solo apaga el guard si sigue siendo la vigente,
   // así un callback de una locución cancelada (al cambiar de modo) no reactiva la
   // detección en medio de la siguiente. El colchón de 300 ms absorbe la cola acústica.
@@ -89,12 +93,11 @@ export function useTuner(
     nullCountRef.current = 0
     committedStatusRef.current = 'silent'
 
-    if (ttsEnabledRef.current) {
-      const text = targetStringIndex === null
-        ? 'Modo automático'
-        : `Afinando ${NOTE_NAMES_ES[GUITAR_STRINGS[targetStringIndex].label] ?? GUITAR_STRINGS[targetStringIndex].label}`
-      announce(text)
-    }
+    const text = targetStringIndex === null
+      ? 'Modo automático'
+      : `Afinando ${NOTE_NAMES_ES[GUITAR_STRINGS[targetStringIndex].label] ?? GUITAR_STRINGS[targetStringIndex].label}`
+    setAnnouncement(text)
+    if (ttsEnabledRef.current) announce(text)
   }, [targetStringIndex, announce])
 
   useEffect(() => {
@@ -104,6 +107,7 @@ export function useTuner(
       setDetectedNote(null)
       setStatus('silent')
       setActiveStringIndex(null)
+      setAnnouncement('')
       lastNoteKeyRef.current = ''
       lastStatusRef.current = 'silent'
       committedStatusRef.current = 'silent'
@@ -194,12 +198,16 @@ export function useTuner(
         const statusChanged = newStatus !== lastStatusRef.current
         const cooldownOk = now - lastTtsTimeRef.current > TTS_COOLDOWN_MS
 
-        if (statusChanged && cooldownOk && ttsEnabledRef.current) {
+        if (statusChanged && cooldownOk) {
           const nameEs = NOTE_NAMES_ES[targetNote.note] ?? targetNote.note
           const suffix =
-            newStatus === 'tuned' ? 'Afinado.' : newStatus === 'high' ? 'Un poco alto.' : 'Un poco bajo.'
+            newStatus === 'tuned'
+              ? 'Afinado.'
+              : `${Math.abs(displayNote.cents)} centavos ${newStatus === 'high' ? 'alto' : 'bajo'}.`
+          const text = `${nameEs}. ${suffix}`
           if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-          announce(`${nameEs}. ${suffix}`)
+          setAnnouncement(text)
+          if (ttsEnabledRef.current) announce(text)
           lastTtsTimeRef.current = now
           lastNoteKeyRef.current = `${targetNote.note}${targetNote.octave}`
           lastStatusRef.current = newStatus
@@ -256,12 +264,16 @@ export function useTuner(
       const changed = noteKey !== lastNoteKeyRef.current || newStatus !== lastStatusRef.current
       const cooldownOk = now - lastTtsTimeRef.current > TTS_COOLDOWN_MS
 
-      if (changed && cooldownOk && ttsEnabledRef.current) {
+      if (changed && cooldownOk) {
         const nameEs = NOTE_NAMES_ES[refString.label] ?? refString.label
         const suffix =
-          newStatus === 'tuned' ? 'Afinado.' : newStatus === 'high' ? 'Un poco alto.' : 'Un poco bajo.'
+          newStatus === 'tuned'
+            ? 'Afinado.'
+            : `${Math.abs(centsFromString)} centavos ${newStatus === 'high' ? 'alto' : 'bajo'}.`
+        const text = `${nameEs}. ${suffix}`
         if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-        announce(`${nameEs}. ${suffix}`)
+        setAnnouncement(text)
+        if (ttsEnabledRef.current) announce(text)
         lastTtsTimeRef.current = now
         lastNoteKeyRef.current = noteKey
         lastStatusRef.current = newStatus
@@ -287,5 +299,5 @@ export function useTuner(
     setIsListening((prev) => !prev)
   }, [])
 
-  return { detectedNote, status, activeStringIndex, isListening, toggle }
+  return { detectedNote, status, activeStringIndex, isListening, announcement, toggle }
 }

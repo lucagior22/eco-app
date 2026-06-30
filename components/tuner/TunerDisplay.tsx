@@ -1,6 +1,8 @@
 'use client'
 
-// Accesibilidad: la región aria-live anuncia nota + estado cuando cambian.
+// Accesibilidad: este display es puramente visual. El anuncio de nota + estado al usuario
+// que no ve viaja por el canal único (TTS de la app + región aria-live en AfinadorScreen,
+// alimentada por `announcement` de useTuner), no por este bloque, para evitar doble voz.
 // La fila de cuerdas es una lista de toggle buttons: aria-pressed indica la cuerda seleccionada.
 // El display de frecuencia tiene aria-label explícito para no leer el número sin unidad.
 
@@ -68,7 +70,7 @@ export default function TunerDisplay({
         </p>
       )}
 
-      <div aria-live="polite" aria-atomic="true" className="flex flex-col items-center gap-2 text-center">
+      <div className="flex flex-col items-center gap-2 text-center">
         <span
           className={[
             'text-8xl font-bold leading-none',

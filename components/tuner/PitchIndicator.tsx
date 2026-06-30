@@ -1,7 +1,8 @@
 'use client'
 
 // Accesibilidad: el componente es puramente visual (aria-hidden).
-// El estado de afinación ya se anuncia via aria-live en TunerDisplay.
+// La magnitud de la desviación llega al usuario que no ve por el canal único de audio
+// (incluida en `announcement` de useTuner: "Mi. 12 centavos alto."), no por esta barra.
 
 import type { TuningStatus } from '@/hooks/useTuner'
 

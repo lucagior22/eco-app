@@ -7,6 +7,7 @@ import { useTuner } from '@/hooks/useTuner'
 import type { TuningStatus } from '@/hooks/useTuner'
 import TunerDisplay from '@/components/tuner/TunerDisplay'
 import PitchIndicator from '@/components/tuner/PitchIndicator'
+import { isTtsSupported } from '@/lib/tts'
 import { Button } from 'react-aria-components'
 
 function getTintColor(status: TuningStatus, cents: number, listening: boolean): string {
@@ -59,13 +60,18 @@ export default function AfinadorScreen() {
   const { settings } = useSettings()
   const [ttsEnabled, setTtsEnabled] = useState(true)
   const [selectedStringIndex, setSelectedStringIndex] = useState<number | null>(null)
-  const { stream, error, devices, selectedDeviceId, selectDevice } = useMicrophone()
-  const { detectedNote, status, activeStringIndex, isListening, toggle } = useTuner(
+  const { stream, error, devices, selectedDeviceId, selectDevice, retry } = useMicrophone()
+  const { detectedNote, status, activeStringIndex, isListening, announcement, toggle } = useTuner(
     stream,
     settings.ttsSpeed,
     ttsEnabled,
     selectedStringIndex,
   )
+
+  // Canal único: cuando el narrador de la app vocaliza, la región aria-live queda en off
+  // para no duplicar la voz. Si el narrador está silenciado o el navegador no soporta TTS,
+  // pasa a polite y el lector de pantalla se vuelve el canal de fallback.
+  const liveMode = ttsEnabled && isTtsSupported() ? 'off' : 'polite'
 
   if (error) {
     return (
@@ -76,6 +82,9 @@ export default function AfinadorScreen() {
         <p className="text-sm text-[var(--color-text-secondary)]">
           Activá el permiso de micrófono en la configuración del navegador.
         </p>
+        <Button onPress={retry} aria-label="Reintentar acceso al micrófono" className={BTN}>
+          Reintentar
+        </Button>
       </div>
     )
   }
@@ -97,6 +106,10 @@ export default function AfinadorScreen() {
       className="flex flex-1 flex-col items-center gap-10 px-4 py-8 transition-[background-color] duration-300"
       style={{ backgroundColor: getTintColor(status, detectedNote?.cents ?? 0, isListening) }}
     >
+      <p className="sr-only" role="status" aria-live={liveMode} aria-atomic="true">
+        {announcement}
+      </p>
+
       <div className="w-full max-w-sm rounded-3xl bg-[var(--color-surface)] p-6">
         <TunerDisplay
           detectedNote={detectedNote}
@@ -114,7 +127,7 @@ export default function AfinadorScreen() {
       <div className="flex flex-wrap justify-center gap-3">
         <Button
           onPress={toggle}
-          aria-pressed={!isListening}
+          aria-pressed={isListening}
           aria-label={isListening ? 'Pausar micrófono' : 'Reanudar micrófono'}
           className={BTN}
         >
@@ -124,7 +137,7 @@ export default function AfinadorScreen() {
 
         <Button
           onPress={() => setTtsEnabled((v) => !v)}
-          aria-pressed={!ttsEnabled}
+          aria-pressed={ttsEnabled}
           aria-label={ttsEnabled ? 'Silenciar narrador' : 'Activar narrador'}
           className={BTN}
         >
@@ -134,7 +147,7 @@ export default function AfinadorScreen() {
       </div>
 
       {devices.length > 1 && (
-        <div className="hidden w-full max-w-xs flex-col gap-1 md:flex">
+        <div className="flex w-full max-w-xs flex-col gap-1">
           <label htmlFor="mic-select" className="text-sm text-[var(--color-text-secondary)]">
             Micrófono
           </label>
