@@ -116,6 +116,14 @@ La narración pasa por un único helper `announce(text)` que usa un **token de g
 Qué se anuncia (con cooldown de 3 s y solo ante cambios): al fijar cuerda, `"Afinando <nota>"`;
 en automático, `"Modo automático"`; y por cambio de estado, `"<nota>. Afinado/Un poco alto/Un poco bajo."`.
 
+**Excepciones al cooldown/repetición** (para no perder el resultado más importante):
+- La transición a `tuned` **ignora el cooldown** de 3 s: al afinar se llega a "Afinado"
+  enseguida del aviso previo, y el cooldown lo descartaría. Sigue gateado por el cambio de
+  estado, así que no se repite mientras se sostiene afinado.
+- Cuando se deja de detectar y vence `HOLD_MS`, se reinicia el seguimiento de anuncios
+  (`committedStatusRef`, `lastStatusRef`, `lastNoteKeyRef` a estado "silencio"): así, al
+  retomar una cuerda ya afinada tras una pausa, se vuelve a anunciar el resultado.
+
 ## Limitaciones conocidas
 
 - La granularidad fina (cents exactos) no se narra; ver hallazgos en

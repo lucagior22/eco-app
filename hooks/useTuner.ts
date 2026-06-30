@@ -163,6 +163,11 @@ export function useTuner(
             setActiveStringIndex(null)
             smoothedFreqRef.current = null
             holdTimerRef.current = null
+            // Estado fresco tras el silencio: si se retoma una cuerda ya afinada, debe
+            // tratarse como evento nuevo y volver a anunciar el resultado.
+            committedStatusRef.current = 'silent'
+            lastStatusRef.current = 'silent'
+            lastNoteKeyRef.current = ''
           }, HOLD_MS)
         }
         return
@@ -198,12 +203,13 @@ export function useTuner(
         const statusChanged = newStatus !== lastStatusRef.current
         const cooldownOk = now - lastTtsTimeRef.current > TTS_COOLDOWN_MS
 
-        if (statusChanged && cooldownOk) {
+        // "Afinado" ignora el cooldown: es el resultado más importante y suele alcanzarse
+        // dentro de los 3 s del anuncio previo. statusChanged evita repetirlo mientras se
+        // sostiene afinado; el cooldown sigue limitando los avisos de "un poco alto/bajo".
+        if (statusChanged && (cooldownOk || newStatus === 'tuned')) {
           const nameEs = NOTE_NAMES_ES[targetNote.note] ?? targetNote.note
           const suffix =
-            newStatus === 'tuned'
-              ? 'Afinado.'
-              : `${Math.abs(displayNote.cents)} centavos ${newStatus === 'high' ? 'alto' : 'bajo'}.`
+            newStatus === 'tuned' ? 'Afinado.' : newStatus === 'high' ? 'Un poco alto.' : 'Un poco bajo.'
           const text = `${nameEs}. ${suffix}`
           if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
           setAnnouncement(text)
@@ -264,12 +270,10 @@ export function useTuner(
       const changed = noteKey !== lastNoteKeyRef.current || newStatus !== lastStatusRef.current
       const cooldownOk = now - lastTtsTimeRef.current > TTS_COOLDOWN_MS
 
-      if (changed && cooldownOk) {
+      if (changed && (cooldownOk || newStatus === 'tuned')) {
         const nameEs = NOTE_NAMES_ES[refString.label] ?? refString.label
         const suffix =
-          newStatus === 'tuned'
-            ? 'Afinado.'
-            : `${Math.abs(centsFromString)} centavos ${newStatus === 'high' ? 'alto' : 'bajo'}.`
+          newStatus === 'tuned' ? 'Afinado.' : newStatus === 'high' ? 'Un poco alto.' : 'Un poco bajo.'
         const text = `${nameEs}. ${suffix}`
         if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
         setAnnouncement(text)
