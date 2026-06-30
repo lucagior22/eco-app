@@ -4,6 +4,7 @@ import './globals.css'
 import { SettingsProvider } from '@/contexts/SettingsContext'
 import { SkipLink } from '@/components/layout/SkipLink'
 import { Navigation } from '@/components/layout/Navigation'
+import { WelcomeModal } from '@/components/layout/WelcomeModal'
 
 const atkinson = Atkinson_Hyperlegible({
   subsets: ['latin'],
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="flex min-h-full flex-col">
         <SettingsProvider>
+          <WelcomeModal />
           {/* SkipLink debe ser el PRIMER elemento focusable — antes del nav */}
           <SkipLink />
           <Navigation />
