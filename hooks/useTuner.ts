@@ -28,8 +28,9 @@ const CENTS_THRESHOLD_STAY = 20
 const TTS_COOLDOWN_MS = 3000
 const FFT_SIZE = 4096
 const HOLD_MS = 2000
-const MEDIAN_WINDOW = 5
+const MEDIAN_WINDOW = 3
 const JUMP_THRESHOLD_CENTS = 200
+const EMA_ALPHA = 0.4
 
 export function useTuner(
   stream: MediaStream | null,
@@ -54,14 +55,28 @@ export function useTuner(
   const freqHistoryRef = useRef<number[]>([])
   const isSpeakingRef = useRef(false)
   const nullCountRef = useRef(0)
+  const smoothedFreqRef = useRef<number | null>(null)
 
   useEffect(() => { ttsEnabledRef.current = ttsEnabled }, [ttsEnabled])
   useEffect(() => { ttsSpeedRef.current = ttsSpeed }, [ttsSpeed])
   useEffect(() => {
     targetStringIndexRef.current = targetStringIndex
     freqHistoryRef.current = []
+    smoothedFreqRef.current = null
     nullCountRef.current = 0
     committedStatusRef.current = 'silent'
+
+    if (ttsEnabledRef.current) {
+      cancelSpeech()
+      isSpeakingRef.current = true
+      const text = targetStringIndex === null
+        ? 'Modo automático'
+        : `Afinando ${NOTE_NAMES_ES[GUITAR_STRINGS[targetStringIndex].label] ?? GUITAR_STRINGS[targetStringIndex].label}`
+      speak(text, ttsSpeedRef.current, () => {
+        isSpeakingRef.current = false
+        freqHistoryRef.current = []
+      })
+    }
   }, [targetStringIndex])
 
   useEffect(() => {
@@ -114,6 +129,7 @@ export function useTuner(
             setDetectedNote(null)
             setStatus('silent')
             setActiveStringIndex(null)
+            smoothedFreqRef.current = null
             holdTimerRef.current = null
           }, HOLD_MS)
         }
@@ -170,17 +186,37 @@ export function useTuner(
       }
 
       // Modo automático: filtro de mediana sobre historial de frecuencias
+
+      // Corrección de subarmónicos: YIN puede detectar E4/2 ≈ 165 Hz (→ D3) o E4/3 ≈ 110 Hz (→ A2)
+      // en lugar de la fundamental. Si doblar la frecuencia da un match más cercano a una cuerda, usarlo.
+      let correctedFreq = rawFreq
+      const doubled = rawFreq * 2
+      if (doubled <= 1600) {
+        const rawIdx = closestStringIndex(rawFreq)
+        const doubledIdx = closestStringIndex(doubled)
+        const rawCents = Math.abs(1200 * Math.log2(rawFreq / GUITAR_STRINGS[rawIdx].frequency))
+        const doubledCents = Math.abs(1200 * Math.log2(doubled / GUITAR_STRINGS[doubledIdx].frequency))
+        if (doubledCents < rawCents) correctedFreq = doubled
+      }
+
       const history = freqHistoryRef.current
       if (history.length > 0) {
-        const jumpCents = Math.abs(1200 * Math.log2(rawFreq / history[history.length - 1]))
-        if (jumpCents > JUMP_THRESHOLD_CENTS) freqHistoryRef.current = []
+        const jumpCents = Math.abs(1200 * Math.log2(correctedFreq / history[history.length - 1]))
+        if (jumpCents > JUMP_THRESHOLD_CENTS) {
+          freqHistoryRef.current = []
+          smoothedFreqRef.current = null
+        }
       }
-      freqHistoryRef.current.push(rawFreq)
+      freqHistoryRef.current.push(correctedFreq)
       if (freqHistoryRef.current.length > MEDIAN_WINDOW) freqHistoryRef.current.shift()
 
       nullCountRef.current = 0
       const sorted = [...freqHistoryRef.current].sort((a, b) => a - b)
-      const freq = sorted[Math.floor(sorted.length / 2)]
+      const medianFreq = sorted[Math.floor(sorted.length / 2)]
+      smoothedFreqRef.current = smoothedFreqRef.current === null
+        ? medianFreq
+        : EMA_ALPHA * medianFreq + (1 - EMA_ALPHA) * smoothedFreqRef.current
+      const freq = smoothedFreqRef.current
 
       if (holdTimerRef.current) {
         clearTimeout(holdTimerRef.current)

@@ -2,7 +2,6 @@
 
 // Accesibilidad: el componente es puramente visual (aria-hidden).
 // El estado de afinación ya se anuncia via aria-live en TunerDisplay.
-// El cents label textual debajo de la barra es visible para todos los usuarios.
 
 import type { TuningStatus } from '@/hooks/useTuner'
 
@@ -21,24 +20,31 @@ export default function PitchIndicator({ cents, status }: PitchIndicatorProps) {
   const centsLabel =
     status === 'silent'
       ? ''
-      : status === 'tuned'
-        ? `${Math.abs(cents)} centavos`
-        : `${Math.abs(cents)} centavos ${status === 'high' ? 'alto' : 'bajo'}`
+      : cents === 0
+        ? '0'
+        : cents > 0
+          ? `+${cents}`
+          : `${cents}`
 
   return (
     <div className="w-full max-w-xs" aria-hidden="true">
-      <div className="relative h-2 rounded-full bg-[var(--color-border)]">
-        <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-[var(--color-text-secondary)] opacity-50" />
+      <div className="relative h-10 w-full">
+        <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-[var(--color-border)]" />
+        <div className="absolute left-1/2 top-1/2 h-5 w-px -translate-x-1/2 -translate-y-1/2 bg-[var(--color-text-secondary)] opacity-50" />
         {status !== 'silent' && (
           <div
-            className="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full shadow transition-[left] duration-100"
-            style={{ left: `${positionPct}%`, backgroundColor: dotColor }}
+            className="absolute top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full transition-[left] duration-100"
+            style={{
+              left: `${positionPct}%`,
+              backgroundColor: dotColor,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+            }}
           />
         )}
       </div>
-      <div className="mt-2 flex justify-between text-xs text-[var(--color-text-secondary)]">
+      <div className="mt-2 flex justify-between text-base text-[var(--color-text-secondary)]">
         <span>-50</span>
-        <span className="text-[var(--color-text-primary)]">{centsLabel}</span>
+        <span className="font-medium text-[var(--color-text-primary)]">{centsLabel}</span>
         <span>+50</span>
       </div>
     </div>
