@@ -58,9 +58,13 @@ export default function Metronome() {
 
   const beatsPerMeasure = TIME_SIGNATURES[signatureIndex]
 
-  const onBeat = useCallback((_beat: number, accent: boolean) => {
-    navigator.vibrate?.(accent ? 80 : 50)
-  }, [])
+  const vibration = settings.vibration
+  const onBeat = useCallback(
+    (_beat: number, accent: boolean) => {
+      if (vibration) navigator.vibrate?.(accent ? 80 : 50)
+    },
+    [vibration],
+  )
 
   const { currentBeat } = useMetronome({ bpm, beatsPerMeasure, isPlaying, onBeat })
 

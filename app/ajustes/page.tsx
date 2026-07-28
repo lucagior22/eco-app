@@ -3,6 +3,8 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { ThemeSetting } from '@/components/settings/ThemeSetting'
 import { FontSizeSetting } from '@/components/settings/FontSizeSetting'
 import { FontFamilySetting } from '@/components/settings/FontFamilySetting'
+import { TtsSpeedSetting } from '@/components/settings/TtsSpeedSetting'
+import { VibrationSetting } from '@/components/settings/VibrationSetting'
 export const metadata: Metadata = {
   title: 'Ajustes — Eco',
 }
@@ -18,6 +20,8 @@ export default function AjustesPage() {
         <ThemeSetting />
         <FontSizeSetting />
         <FontFamilySetting />
+        <TtsSpeedSetting />
+        <VibrationSetting />
       </div>
     </>
   )

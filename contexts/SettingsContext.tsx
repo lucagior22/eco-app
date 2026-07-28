@@ -9,6 +9,7 @@ interface SettingsContextValue {
   setFontSize: (fontSize: EcoSettings['fontSize']) => void
   setTtsSpeed: (ttsSpeed: EcoSettings['ttsSpeed']) => void
   setFontFamily: (fontFamily: EcoSettings['fontFamily']) => void
+  setVibration: (vibration: EcoSettings['vibration']) => void
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
@@ -46,8 +47,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setSettings((prev) => ({ ...prev, fontFamily }))
   }
 
+  function setVibration(vibration: EcoSettings['vibration']) {
+    setSettings((prev) => ({ ...prev, vibration }))
+  }
+
   return (
-    <SettingsContext.Provider value={{ settings, setTheme, setFontSize, setTtsSpeed, setFontFamily }}>
+    <SettingsContext.Provider
+      value={{ settings, setTheme, setFontSize, setTtsSpeed, setFontFamily, setVibration }}
+    >
       {children}
     </SettingsContext.Provider>
   )

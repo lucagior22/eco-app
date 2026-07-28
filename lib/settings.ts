@@ -5,6 +5,7 @@ export interface EcoSettings {
   fontSize: 'sm' | 'md' | 'lg' | 'xl'
   ttsSpeed: 'slow' | 'normal' | 'fast' | 'very-fast'
   fontFamily: 'hyperlegible' | 'inter' | 'lexend' | 'system'
+  vibration: boolean
 }
 
 export const SETTINGS_KEY = 'eco-settings'
@@ -14,6 +15,7 @@ export const DEFAULT_SETTINGS: EcoSettings = {
   fontSize: 'md',
   ttsSpeed: 'normal',
   fontFamily: 'hyperlegible',
+  vibration: true,
 }
 
 // Mapeo de velocidad TTS a SpeechSynthesis.rate (§6.5)
