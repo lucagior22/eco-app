@@ -34,6 +34,8 @@ Backend (mismo contenedor):
 └── /api/ocr/route.ts → child_process → oemer (Python 3)
 ```
 
+> **Implementado:** `/api/ocr` usa **Tesseract OCR** (binario del sistema vía `child_process`), no oemer. oemer es un OMR y no reconoce cifrado de acordes, que es lo que esta pantalla necesita leer. Ver DECISIONS.md, entrada "Tesseract con whitelist de cifrado".
+
 ---
 
 ## 3. Estructura de archivos
@@ -245,6 +247,8 @@ Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
 - Response exitosa: `{ chords: string[], rawText: string }`
 - Response error: `{ error: string }`
 
+> **Implementado:** el proceso es `tesseract <imagen> <base> --psm 4 -c tessedit_char_whitelist=... tsv`, no oemer. Se escribe la imagen a `/tmp`, se corre Tesseract con una whitelist restringida al alfabeto del cifrado (A-G, `#`, `b`, sufijos de calidad, dígitos, `/`), y se parsea la salida TSV. Cada token se valida contra un regex derivado de `CHORD_QUALITIES` (`lib/chords.ts`) y se descarta lo que tenga confianza menor a 40, de modo que las cabezas de nota y los restos de pentagrama no entren como acordes. Los acordes se devuelven **en orden de lectura** (por renglón y de izquierda a derecha) y **sin deduplicar**: para un guitarrista la secuencia es la información, y las repeticiones son parte de la progresión. Timeout de 30 s (Tesseract responde en segundos; los 60 s originales estaban dimensionados para oemer). Si se sube un PDF, se convierte su primera página a PNG a 300 dpi con `pdftoppm` antes del OCR. Ver DECISIONS.md y `claude-docs/OCR-PARTITURA.md` para la medición que respalda `--psm 4` y el umbral de confianza.
+
 **Accesibilidad específica:**
 
 - El estado de carga anuncia "Analizando partitura" via `aria-live="assertive"`
@@ -370,7 +374,9 @@ Serwist: precachear páginas y assets estáticos. Audio y cámara no se cachean.
 
 ## 8. Docker
 
-> **Implementado:** Se cambió la imagen base de `node:20-alpine` a `node:20-bookworm-slim` (Debian). oemer depende de `onnxruntime-gpu`, cuyos wheels en PyPI son exclusivamente manylinux (glibc); en Alpine (musl libc) pip no puede instalarlos. Además, se instala `onnxruntime` (CPU-only) antes de `oemer` para evitar que pip instale la variante `-gpu`, que requeriría CUDA en runtime. Ver DECISIONS.md entradas "Imagen base Debian Bookworm" y "onnxruntime CPU-only".
+> **Implementado:** Se cambió la imagen base de `node:20-alpine` a `node:20-bookworm-slim` (Debian), porque los wheels de PyPI que necesita el proyecto son manylinux (glibc) y en Alpine (musl libc) pip no puede instalarlos. Ver DECISIONS.md entrada "Imagen base Debian Bookworm".
+>
+> **Implementado (2026-07-28):** ya no se instalan `oemer` ni `onnxruntime` — se removieron junto con el cambio a Tesseract. El Dockerfile instala `tesseract-ocr` y `poppler-utils` (para `/api/ocr`) más `opencv-python-headless` y `numpy` (para `/api/pedal/detect`). La imagen resultante es considerablemente más liviana.
 
 ```dockerfile
 # Dockerfile

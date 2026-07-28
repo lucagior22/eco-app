@@ -4,8 +4,10 @@
 // detección de pedal". El botón de detección tiene aria-label explícito que
 // cambia según el estado, y aria-busy mientras se analiza la foto capturada.
 // El botón de flash (si el dispositivo lo soporta) usa aria-pressed para
-// indicar su estado. El resultado de la detección se anuncia via aria-live
-// en PedalScreen.
+// indicar su estado. El resultado de la detección lo anuncia PedalScreen por su
+// canal único (TTS primario + aria-live de fallback), no este componente.
+// El error de cámara sí usa role="alert" acá porque no viaja por ese canal:
+// si la cámara no arranca, `onReady` nunca se dispara y nadie más lo anuncia.
 
 import { useEffect, useRef } from 'react'
 import { useCamera } from '@/hooks/useCamera'

@@ -39,6 +39,12 @@ const QUALITY_MAP: Record<string, string> = {
   '':     'mayor',
 }
 
+// Sufijos de calidad reconocidos, sin el caso vacío (acorde mayor sin sufijo).
+// Los consume /api/ocr para validar los tokens que devuelve Tesseract: así el
+// OCR solo acepta acordes que chordToSpanish sabe narrar, y nunca llega a la
+// voz un sufijo que el mapa de arriba no cubre.
+export const CHORD_QUALITIES: string[] = Object.keys(QUALITY_MAP).filter(Boolean)
+
 /**
  * Convierte un acorde en notación estándar a texto en español legible para TTS.
  * Ejemplos:

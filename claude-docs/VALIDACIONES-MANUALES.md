@@ -10,13 +10,13 @@ Checklist de validaciones requeridas por el enunciado del TFI. Cada sección deb
 
 **Pasos:**
 1. Andá a **validator.w3.org** → pestaña "Validate by URI"
-2. Ingresá la URL de Vercel para cada pantalla (ej. `https://tu-app.vercel.app/pedal`)
+2. Ingresá la URL de la app desplegada para cada pantalla (ej. `https://tu-app.up.railway.app/pedal`)
 3. "Check" → capturá pantalla del resultado
 4. Repetí para `/pedal`, `/ajustes`, `/partitura`
 
 > Usar URI es el método correcto: evita artefactos de copiado y refleja el HTML real servido.
 
-**Estado:** ✅ Completo — 0 errores, 0 warnings por URI. Ver INFORME.md sección 5.
+**Estado:** ✅ Completo — 0 errores, 0 warnings por URI. Ver INFORME.md sección 1.3.
 
 ---
 
@@ -26,10 +26,10 @@ Checklist de validaciones requeridas por el enunciado del TFI. Cada sección deb
 
 **Pasos:**
 1. Andá a **jigsaw.w3.org/css-validator** → pestaña "By URI"
-2. Ingresá la URL de Vercel (ej. `https://tu-app.vercel.app/pedal`)
+2. Ingresá la URL de la app desplegada (ej. `https://tu-app.up.railway.app/pedal`)
 3. "Check" → capturá pantalla del resultado
 
-**Estado:** ✅ Completo — 32 errores y 140 warnings, todos del CSS generado por Tailwind v4 (no del código de la app). Ver INFORME.md sección 5.
+**Estado:** ✅ Completo — 32 errores y 140 warnings, todos del CSS generado por Tailwind v4 (no del código de la app). Ver INFORME.md sección 1.3.
 
 ---
 
@@ -45,7 +45,7 @@ Checklist de validaciones requeridas por el enunciado del TFI. Cada sección deb
 5. Verificá que el contenido sea legible y estructurado (Next.js SSR debe mantenerlo)
 6. Capturá pantallas de cada una
 
-**Estado:** ✅ Completo — navegación y estructura SSR correctas; funcionalidades de browser (cámara, mic, ajustes) requieren JS. Ver INFORME.md sección 5.
+**Estado:** ✅ Completo — navegación y estructura SSR correctas; funcionalidades de browser (cámara, mic, ajustes) requieren JS. Ver INFORME.md sección 1.3.
 
 ---
 
@@ -65,7 +65,7 @@ Checklist de validaciones requeridas por el enunciado del TFI. Cada sección deb
 2. Seleccioná el nodo → Delete para eliminar cada hoja de estilos
 3. Observá y capturá
 
-**Estado:** ✅ Completo — contenido legible y funcional, orden lógico preservado. Ver INFORME.md sección 5.
+**Estado:** ✅ Completo — contenido legible y funcional, orden lógico preservado. Ver INFORME.md sección 1.3.
 
 ---
 
@@ -84,7 +84,7 @@ Checklist de validaciones requeridas por el enunciado del TFI. Cada sección deb
 - Activá un botón con Enter/Espacio
 - Verificá que el resultado sea equivalente al de Chrome
 
-**Estado:** ✅ Completo — Chrome, Brave, Edge (Blink) y Firefox (Gecko) funcionan correctamente. Ver INFORME.md sección 5.
+**Estado:** ✅ Completo — Chrome, Brave, Edge (Blink) y Firefox (Gecko) funcionan correctamente. Ver INFORME.md sección 1.3.
 
 ---
 
@@ -106,4 +106,4 @@ Checklist de validaciones requeridas por el enunciado del TFI. Cada sección deb
 3. Verificá que el layout no se rompa y el texto sea legible
 4. Capturá los extremos: móvil más chico (375×667) y desktop (1920×1080)
 
-**Estado:** ✅ Completo — funcional en todos los tamaños; overflow detectado solo en iPhone SE con fuente muy grande. Ver INFORME.md sección 5.
+**Estado:** ✅ Completo — funcional en todos los tamaños; overflow detectado solo en iPhone SE con fuente muy grande. Ver INFORME.md sección 1.3.

@@ -34,10 +34,56 @@ YIN es robusto en señales monofónicas de instrumentos (guitarra, bajo, viento)
 
 ## 2026-06-01 — oemer vía child_process (no API externa)
 
+> **Revertida el 2026-07-28.** oemer no reconoce cifrado de acordes, así que nunca pudo cumplir el requisito de `/partitura`. Ver la entrada "Tesseract con whitelist de cifrado".
+
 **Decisión:** El OCR/OMR (reconocimiento óptico de partituras) se invoca localmente como proceso Python desde `/api/ocr/route.ts` usando `child_process`.
 
 **Razones:**
 Mantiene el procesamiento local sin dependencias de servicios externos ni costos por uso. oemer es la herramienta de OMR open source más madura para Python; invocarlo vía `child_process` es la integración más simple posible desde un API route de Next.js. No hay API REST oficial de oemer que simplificaría este approach.
+
+---
+
+## 2026-07-28 — Canal único de audio extendido a /pedal y /partitura
+
+**Decisión:** El patrón de canal único que se había aplicado solo a `/afinador` (ver entrada del 2026-06-30) pasa a regir en toda la app. En `/pedal`, una función `announce` centraliza el texto y alimenta los dos canales posibles: el TTS de la app como primario y una única región `aria-live` como fallback, que queda en `off` mientras el navegador soporte Web Speech. En `/partitura`, la región `sr-only` es la única live region de la pantalla. Se removieron el `role="alert"` del error de `/pedal`, el `aria-live` que envolvía a `PedalInfo`, y el `role="alert"` del error de `HarmonyList`.
+
+**Razones:**
+Las dos pantallas anunciaban cada mensaje dos veces. En `/pedal` el solapamiento era entre el TTS y la región `aria-live` —exactamente el problema que ya se había corregido en el afinador—, y en `/partitura` entre dos live regions que contenían el mismo texto de error. Para un usuario con VoiceOver o NVDA el efecto es el mismo en ambos casos: escuchar todo repetido.
+
+Se encontró además una tercera duplicación de la misma familia en la lista de acordes: el nombre en español estaba en un `span` con `sr-only` **y** en un `span` visible sin `aria-hidden`, con lo cual el lector de pantalla leía "La menor. La menor." en cada ítem. Ahora vive en un único nodo, visible y accesible a la vez.
+
+**Dos detalles que el caso del afinador no había expuesto:**
+
+1. **Hidratación.** `isTtsSupported()` no se puede evaluar durante el render: en el servidor no existe `window`, así que devuelve "no soportado" y el cliente diría lo contrario, rompiendo la hidratación del atributo `aria-live`. En `/afinador` el problema no aparecía porque su región live vive detrás del estado de carga del micrófono y nunca se renderiza en SSR. En `/pedal` la región existe desde el primer render, así que el soporte se resuelve después de montar. El valor inicial (`polite`) es además el correcto para el HTML servido sin JS, donde no hay narrador posible.
+
+2. **Momento de montaje de la live region.** En `/partitura` la región `sr-only` estaba dentro del `return null` del estado `idle`, es decir, aparecía en el DOM al mismo tiempo que su contenido. Los lectores de pantalla no anuncian de forma confiable una región live que se monta junto con su texto: hay que tenerla presente y vacía desde el primer render. Sin este arreglo, consolidar el canal único habría dejado a la pantalla con un solo canal que además podía no sonar nunca.
+
+**Caso conocido que NO se cambió:** en `/ajustes`, `TtsSpeedSetting` narra una muestra ("Velocidad rápida") al cambiar la velocidad, mientras `SettingCarousel` anuncia el valor ("Rápida") por su propia región `aria-live`. Es una duplicación real, pero la muestra hablada es funcionalmente necesaria —un usuario que no ve percibe el cambio de velocidad únicamente al escucharlo— y silenciar la región del carrusel exigiría agregarle una prop a un componente compartido por las cinco preferencias, de las cuales las otras cuatro dependen de esa región como único canal. Queda pendiente de decisión.
+
+**Verificado:** el HTML servido por SSR (equivalente a la validación "sin JavaScript") tiene exactamente una live region en `/pedal` y una en `/partitura`, y ningún `role="alert"` remanente en ninguna de las dos.
+
+---
+
+## 2026-07-28 — Tesseract con whitelist de cifrado (reemplaza a oemer)
+
+**Decisión:** `/api/ocr` deja de usar oemer y pasa a usar Tesseract OCR con una whitelist de caracteres (`tessedit_char_whitelist`) y modo `--psm 4` (single column of text of variable sizes). Esto reemplaza la entrada del 2026-06-01 "oemer vía child_process". Se removieron oemer y onnxruntime del Dockerfile; se agregaron `tesseract-ocr` y `poppler-utils`.
+
+**Razones:**
+oemer es un OMR (Optical **Music** Recognition): reconoce cabezas de nota, claves, silencios y barras de compás. Su propia documentación aclara que **no reconoce cifrado de acordes, armonía, letra ni texto**. El parser de `/api/ocr` buscaba elementos `<harmony>` en el MusicXML de salida, que oemer no emite nunca — por lo que la lista de acordes venía vacía con cualquier imagen. La herramienta no resolvía la tarea planteada: en una partitura los acordes están impresos como **texto** ("Am", "F", "G7") sobre el pentagrama, así que detectarlos es un problema de OCR de texto, no de OMR.
+
+Además de no funcionar, oemer era inviable en el entorno de deployment: su documentación indica 3–5 minutos por partitura *con GPU* (el `TIMEOUT_MS` del route era de 60 s), hasta 10 minutos la primera vez porque descarga los checkpoints en runtime, y los modelos ONNX no entran cómodos en la memoria del plan free de Railway. Tesseract no tiene modelos pesados, responde en segundos y el paquete de Debian pesa unos pocos MB.
+
+Se eligió el binario de Tesseract vía `child_process` y no `tesseract.js` (WASM) para mantener el patrón que ya usa `/api/pedal/detect`, evitar una dependencia npm pesada, y no pagar el costo de arranque de WASM ni la descarga de los datos de idioma en runtime.
+
+**`--psm 4`, no `--psm 11`:** el modo *sparse text* (11) parecía el natural, porque el cifrado son símbolos sueltos flotando sobre los pentagramas. Medido contra una hoja de prueba con 16 acordes resultó al revés: PSM 4 detecta los 16 sin basura, mientras que PSM 11 detecta 11 y pierde justamente los acordes de **una sola letra** (`F`, `C`, `G`) — los más frecuentes en guitarra. PSM 3 dio el mismo resultado que PSM 4 en la prueba; se prefirió el 4 porque asumir "una sola columna" es una hipótesis más restringida y estable frente a fotos con inclinación que dejar la segmentación totalmente automática.
+
+**Cómo se controlan los falsos positivos:** la whitelist no rechaza caracteres, solo restringe el alfabeto entre el que Tesseract elige — una cabeza de nota igual sale como *alguna* letra permitida. El filtrado real son dos capas: confianza mínima por palabra (`CONF_MIN = 40`, de la columna `conf` de la salida TSV) y validación de cada token contra un regex construido a partir de `CHORD_QUALITIES` en `lib/chords.ts`. Derivar el regex de `CHORD_QUALITIES` garantiza que el OCR solo acepte acordes que `chordToSpanish` sabe narrar, de modo que nunca llegue a la voz un sufijo sin traducción al español. El umbral de 40 sale de la medición: en la hoja de prueba el cifrado legítimo entró entre 73 y 97 de confianza y la basura del pentagrama entre 0 y 9. No conviene subirlo, porque los acordes de una sola letra son los que menos confianza sacan (`C` entró con 73).
+
+**No se deduplica la lista.** La implementación con oemer devolvía un `Set`, que perdía tanto el orden como las repeticiones. Para un guitarrista la secuencia *es* la información, y un `Am Am F F` se toca así. Tesseract emite cada palabra una sola vez en el TSV, con lo cual no hay detecciones duplicadas que limpiar (a diferencia de `detect_knobs.py`, donde varias pasadas de Hough sí producen duplicados).
+
+**Verificación:** probado de punta a punta dentro del contenedor. Hoja de prueba en PNG: 16 de 16 acordes, en orden correcto, incluyendo repeticiones (`Am Am`), bajo invertido (`D/F#`), sostenido (`A#m7`), bemol (`Bb`), `sus4` y `maj7`. La misma hoja en PDF: 16 de 16. Una foto sin partitura (una de las capturas de pedal) devuelve lista vacía, sin falsos positivos. Un archivo corrupto devuelve HTTP 500 con mensaje descriptivo.
+
+**Limitación conocida:** solo detecta acordes escritos como cifrado alfabético sobre el pentagrama (lead sheets, cancioneros, real books) — que es el formato que usa un guitarrista. Una partitura de música clásica sin cifrado, donde la armonía está implícita en las notas, no devuelve nada: eso requeriría OMR más análisis armónico, y es justamente lo que se descartó por costo e inviabilidad en el entorno de deployment. De los PDF se procesa únicamente la primera página, rasterizada a 300 dpi (se probaron 400 y 600 dpi y el reconocimiento empeoró).
 
 ---
 
@@ -51,6 +97,8 @@ oemer depende de `onnxruntime-gpu`, cuyos wheels en PyPI son exclusivamente many
 ---
 
 ## 2026-06-01 — onnxruntime CPU-only (no onnxruntime-gpu)
+
+> **Sin efecto desde el 2026-07-28.** onnxruntime entraba solo como dependencia de oemer; al removerse oemer, ya no se instala. La decisión de imagen base sigue en pie por los wheels manylinux de OpenCV.
 
 **Decisión:** Se instala `onnxruntime` (CPU) antes de `oemer` en el Dockerfile para evitar que pip instale `onnxruntime-gpu`.
 

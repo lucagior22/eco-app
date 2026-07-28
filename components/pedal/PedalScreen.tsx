@@ -2,14 +2,21 @@
 
 // Componente cliente que orquesta el flujo de detección de pedal:
 // captura un frame de la cámara, lo envía a /api/pedal/detect, gestiona
-// el estado de carga/error/resultado, dispara TTS y compone
+// el estado de carga/error/resultado, anuncia el resultado y compone
 // CameraView + PedalInfo. Separado de page.tsx para mantener la página
 // como Server Component y poder exportar metadata.
+//
+// Accesibilidad — canal único de audio (mismo patrón que /afinador): `announce`
+// es la fuente única del texto a anunciar y alimenta los dos canales posibles.
+// El TTS de la app es el primario; la región aria-live es fallback y queda en
+// `off` mientras el navegador soporte Web Speech. Sin esto, el lector de pantalla
+// vocaliza el mismo texto que el narrador y el usuario escucha todo dos veces.
+// Los bloques visuales (error, PedalInfo) no son live regions por el mismo motivo.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import CameraView, { type DetectStatus } from '@/components/pedal/CameraView'
 import PedalInfo, { type Knob } from '@/components/pedal/PedalInfo'
-import { speak } from '@/lib/tts'
+import { speak, isTtsSupported } from '@/lib/tts'
 import { clockHourToSpanish } from '@/lib/clock'
 import { useSettings } from '@/contexts/SettingsContext'
 
@@ -28,10 +35,25 @@ export default function PedalScreen() {
   const [status, setStatus] = useState<DetectStatus>('idle')
   const [knobs, setKnobs] = useState<Knob[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [announcement, setAnnouncement] = useState('')
 
-  function handleReady(torchSupported: boolean) {
-    speak(torchSupported ? TTS_READY_WITH_TORCH : TTS_READY, settings.ttsSpeed)
-  }
+  // Fuente única del texto a anunciar: todo lo que el usuario tiene que escuchar
+  // pasa por acá, así el narrador de la app y la región aria-live de fallback
+  // dicen siempre exactamente lo mismo y nunca se solapan.
+  const announce = useCallback(
+    (text: string) => {
+      setAnnouncement(text)
+      speak(text, settings.ttsSpeed)
+    },
+    [settings.ttsSpeed]
+  )
+
+  const handleReady = useCallback(
+    (torchSupported: boolean) => {
+      announce(torchSupported ? TTS_READY_WITH_TORCH : TTS_READY)
+    },
+    [announce]
+  )
 
   const handleCapture = useCallback(
     async (file: File) => {
@@ -49,36 +71,50 @@ export default function PedalScreen() {
           const msg = data.error ?? 'No se pudieron detectar perillas en la imagen.'
           setStatus('error')
           setErrorMessage(msg)
-          speak(msg, settings.ttsSpeed)
+          announce(msg)
           return
         }
 
         setKnobs(data.knobs)
         setStatus('done')
-        speak(buildResultSpeech(data.knobs), settings.ttsSpeed)
+        announce(buildResultSpeech(data.knobs))
       } catch {
         const msg = 'No se pudo conectar con el servidor. Verificá tu conexión.'
         setStatus('error')
         setErrorMessage(msg)
-        speak(msg, settings.ttsSpeed)
+        announce(msg)
       }
     },
-    [settings.ttsSpeed]
+    [announce]
   )
+
+  // El soporte de Web Speech no se puede evaluar durante el render: en el servidor
+  // no existe `window`, así que daría "no soportado" y el cliente diría lo contrario,
+  // rompiendo la hidratación del atributo aria-live. Se resuelve tras montar. El valor
+  // inicial (polite) es además el correcto para el HTML servido sin JS, donde no hay
+  // narrador posible. A diferencia de /afinador, acá la región vive desde el primer
+  // render —no detrás de un estado de carga—, así que la diferencia sí se nota.
+  const [ttsSupported, setTtsSupported] = useState(false)
+  useEffect(() => setTtsSupported(isTtsSupported()), [])
+
+  // Canal único: cuando el narrador de la app vocaliza, la región aria-live queda
+  // en off para no duplicar la voz. Si el navegador no soporta Web Speech, pasa a
+  // ser el canal de fallback — assertive para errores, polite para el resultado.
+  const liveMode = ttsSupported ? 'off' : status === 'error' ? 'assertive' : 'polite'
 
   return (
     <div className="flex flex-col gap-6 p-4">
+      <p className="sr-only" role="status" aria-live={liveMode} aria-atomic="true">
+        {announcement}
+      </p>
+
       <CameraView status={status} onCapture={handleCapture} onReady={handleReady} />
 
-      {status === 'error' && (
-        <p role="alert" className="text-sm text-red-600">
-          {errorMessage}
-        </p>
-      )}
+      {/* Sin role="alert": el texto del error ya viaja por el canal único de arriba.
+          Acá queda solo como información visual. */}
+      {status === 'error' && <p className="text-sm text-red-600">{errorMessage}</p>}
 
-      <div aria-live="polite" aria-atomic="true">
-        {status === 'done' && <PedalInfo knobs={knobs} />}
-      </div>
+      {status === 'done' && <PedalInfo knobs={knobs} />}
     </div>
   )
 }

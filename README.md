@@ -7,10 +7,12 @@ PWA para músicos con discapacidad visual: afinador, lector de partituras, metr�
 | Pantalla       | Ruta                   | Estado          |
 | -------------- | ---------------------- | --------------- |
 | Afinador       | `/afinador`            | ✅ Completo     |
-| Leer partitura | `/partitura`           | ⬜ Pendiente    |
-| Metrónomo      | `/partitura/metronomo` | ⬜ Pendiente    |
-| Detectar pedal | `/pedal`               | 🚧 En progreso  |
-| Ajustes        | `/ajustes`             | ⬜ Pendiente    |
+| Leer partitura | `/partitura`           | 🚧 Funcional, precisión irregular |
+| Metrónomo      | `/partitura/metronomo` | ✅ Completo     |
+| Detectar pedal | `/pedal`               | 🚧 Funcional, precisión irregular |
+| Ajustes        | `/ajustes`             | ✅ Completo     |
+
+Las dos pantallas marcadas como *precisión irregular* están implementadas de punta a punta, pero el reconocimiento por visión que las alimenta todavía se equivoca: el OCR confunde y omite acordes sobre partituras reales, y la detección de perillas da lecturas inconsistentes entre fotos del mismo pedal. Ver `INFORME.md` §2.3.
 
 ## Stack
 
@@ -22,7 +24,7 @@ PWA para músicos con discapacidad visual: afinador, lector de partituras, metr�
 | PWA             | @serwist/next                          |
 | Pitch detection | pitchfinder (algoritmo YIN, Web Audio) |
 | TTS             | Web Speech API nativo                  |
-| OCR/OMR         | oemer (Python) vía child_process       |
+| OCR de cifrado  | Tesseract vía child_process            |
 | Estado global   | React Context                          |
 | Persistencia    | localStorage                           |
 
@@ -44,9 +46,13 @@ npm run format:check  # Prettier (solo verifica)
 docker compose up --build
 ```
 
-La app queda disponible en el puerto 3000. Cloudflare Tunnel se configura apuntando a `localhost:3000` para exponer la app vía HTTPS con dominio público.
+La app queda disponible en el puerto 3000.
 
-Copiar `.env.local.example` a `.env.local` y reemplazar `NEXT_PUBLIC_APP_URL` con la URL del tunnel en producción.
+En producción se hostea en **Railway**, que construye y ejecuta el `Dockerfile` del repo directamente, sin configuración adicional: provee HTTPS y dominio público sin mantener un servidor propio. El esquema anterior —Docker sobre un servidor local expuesto con Cloudflare Tunnel— sigue siendo válido como alternativa autohospedada. Ver `DECISIONS.md`.
+
+Copiar `.env.local.example` a `.env.local` y reemplazar `NEXT_PUBLIC_APP_URL` con la URL pública en producción.
+
+El `Dockerfile` instala las dependencias de sistema que necesitan las rutas de API: `tesseract-ocr` y `poppler-utils` para el OCR de partitura, `opencv-python-headless` y `numpy` para la detección de perillas.
 
 ## Accesibilidad
 

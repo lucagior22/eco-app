@@ -98,7 +98,7 @@ Librería: usá **React Aria** para componentes interactivos complejos. No const
 | PWA             | Serwist (`@serwist/next`)                           |
 | Pitch detection | `pitchfinder` (client-side, Web Audio API)          |
 | TTS             | Web Speech API nativo                               |
-| OCR             | `/api/ocr` route → `child_process` → oemer (Python) |
+| OCR             | `/api/ocr` route → `child_process` → Tesseract       |
 | Estado global   | React Context (sin Redux, sin Zustand)              |
 | Persistencia    | `localStorage` para preferencias                    |
 
@@ -134,6 +134,7 @@ Este proyecto es un TFI académico. La documentación sirve de evidencia del pro
 | `claude-docs/VALIDACIONES-MANUALES.md` | Checklist paso a paso de las 6 validaciones manuales requeridas por el enunciado del TFI. |
 | `claude-docs/AFINADOR.md` | Funcionamiento técnico de `/afinador`: stack, pipeline de audio, YIN y thresholds, suavizado, modos y narración TTS. |
 | `claude-docs/EVAL-AFINADOR.md` | Evaluación heurística crítica de `/afinador`: hallazgos de accesibilidad y diseño/UX priorizados con evidencia archivo:línea. |
+| `claude-docs/OCR-PARTITURA.md` | Funcionamiento técnico de `/api/ocr`: por qué Tesseract y no oemer, pipeline, whitelist de cifrado y capas de filtrado. |
 
 ### Carpeta `claude-docs/`
 
