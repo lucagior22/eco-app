@@ -25,9 +25,20 @@ const TTS_READY =
 const TTS_READY_WITH_TORCH =
   'Cámara lista. Si hay poca luz, presioná el botón Encender flash para mejorar la detección. Presioná el botón Detectar pedal para identificar las perillas.'
 
+// Las perillas sin lectura confiable se anuncian como tales en vez de omitirse:
+// si se callaran, el usuario contaría mal las perillas del pedal.
 function buildResultSpeech(knobs: Knob[]): string {
-  const parts = knobs.map((k) => `${k.label} a ${clockHourToSpanish(k.value)}`)
-  return `Detección completa. ${parts.join('. ')}. Presioná Detectar de nuevo para volver a analizar.`
+  const parts = knobs.map((k) =>
+    k.value === null
+      ? `${k.label}, no pude leerla con confianza`
+      : `${k.label} a ${clockHourToSpanish(k.value)}`
+  )
+  const unread = knobs.filter((k) => k.value === null).length
+  const retry =
+    unread > 0
+      ? 'Probá de nuevo con más luz o acercando la cámara.'
+      : 'Presioná Detectar de nuevo para volver a analizar.'
+  return `Detección completa. ${parts.join('. ')}. ${retry}`
 }
 
 export default function PedalScreen() {
@@ -55,13 +66,26 @@ export default function PedalScreen() {
     [announce]
   )
 
+  const handleBurstStart = useCallback(() => {
+    setStatus('capturing')
+    announce('Tomando fotos. Mantené la cámara apuntando al pedal.')
+  }, [announce])
+
   const handleCapture = useCallback(
-    async (file: File) => {
+    async (files: File[]) => {
+      if (files.length === 0) {
+        const msg = 'No se pudo capturar la imagen de la cámara.'
+        setStatus('error')
+        setErrorMessage(msg)
+        announce(msg)
+        return
+      }
+
       setStatus('loading')
       setErrorMessage(null)
 
       const formData = new FormData()
-      formData.append('image', file)
+      files.forEach((file) => formData.append('image', file))
 
       try {
         const res = await fetch('/api/pedal/detect', { method: 'POST', body: formData })
@@ -108,7 +132,12 @@ export default function PedalScreen() {
         {announcement}
       </p>
 
-      <CameraView status={status} onCapture={handleCapture} onReady={handleReady} />
+      <CameraView
+        status={status}
+        onCapture={handleCapture}
+        onBurstStart={handleBurstStart}
+        onReady={handleReady}
+      />
 
       {/* Sin role="alert": el texto del error ya viaja por el canal único de arriba.
           Acá queda solo como información visual. */}

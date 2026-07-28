@@ -9,10 +9,10 @@ PWA para músicos con discapacidad visual: afinador, lector de partituras, metr�
 | Afinador       | `/afinador`            | ✅ Completo     |
 | Leer partitura | `/partitura`           | 🚧 Funcional, precisión irregular |
 | Metrónomo      | `/partitura/metronomo` | ✅ Completo     |
-| Detectar pedal | `/pedal`               | 🚧 Funcional, precisión irregular |
+| Detectar pedal | `/pedal`               | 🚧 Funcional, precisión parcial |
 | Ajustes        | `/ajustes`             | ✅ Completo     |
 
-Las dos pantallas marcadas como *precisión irregular* están implementadas de punta a punta, pero el reconocimiento por visión que las alimenta todavía se equivoca: el OCR confunde y omite acordes sobre partituras reales, y la detección de perillas da lecturas inconsistentes entre fotos del mismo pedal. Ver `INFORME.md` §2.3.
+Las dos pantallas marcadas con 🚧 están implementadas de punta a punta, pero el reconocimiento por visión que las alimenta todavía se equivoca. La de pedal vota entre 5 capturas y **declara explícitamente cuándo no pudo leer una perilla** en vez de arriesgar un número; la de partitura todavía narra un acorde mal reconocido con la misma seguridad que uno correcto. Ver `INFORME.md` §2.3 y `claude-docs/PEDAL.md`.
 
 ## Stack
 

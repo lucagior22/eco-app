@@ -17,4 +17,5 @@ Cuando generes documentación técnica que no sea uno de los docs canónicos de 
 | [`VALIDACIONES-MANUALES.md`](./VALIDACIONES-MANUALES.md) | Checklist paso a paso de las 6 validaciones manuales requeridas por el enunciado: HTML W3C, CSS W3C, sin JS, sin CSS, navegadores, resoluciones. |
 | [`AFINADOR.md`](./AFINADOR.md) | Funcionamiento técnico de `/afinador`: stack, pipeline de audio, YIN y thresholds, suavizado, modos y narración TTS. |
 | [`EVAL-AFINADOR.md`](./EVAL-AFINADOR.md) | Evaluación heurística crítica de la pantalla `/afinador`: hallazgos de accesibilidad (WCAG AA, lectores de pantalla) y diseño/UX (Nielsen), priorizados con evidencia archivo:línea. |
+| [`PEDAL.md`](./PEDAL.md) | Funcionamiento técnico de `/pedal`: pipeline de visión, los tres arreglos medidos del detector, votación entre capturas, identidad estable de las perillas y limitaciones abiertas. |
 | [`OCR-PARTITURA.md`](./OCR-PARTITURA.md) | Funcionamiento técnico de `/api/ocr`: por qué Tesseract y no oemer, pipeline de OCR, whitelist de cifrado, capas de filtrado de falsos positivos y limitaciones. |

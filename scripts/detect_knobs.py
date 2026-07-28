@@ -1,21 +1,32 @@
 #!/usr/bin/env python3
-"""Detección genérica de perillas en una foto de pedal de efectos.
+"""Detección genérica de perillas en fotos de un pedal de efectos.
 
 No identifica marca ni modelo de pedal: solo ubica círculos (perillas) y
 estima hacia qué hora del reloj apunta la marca de cada una (1-12), igual
 que se describe una perilla en la jerga de músicos ("está a las 3"). No
 requiere saber dónde está el 0% ni el 100% de cada perilla — cada una puede
 empezar y terminar en un punto distinto de la circunferencia según el
-modelo de pedal, y el reloj no depende de eso.
+modelo, y el reloj no depende de eso.
 
-Uso: python3 detect_knobs.py <ruta_imagen>
+Recibe VARIAS fotos de la misma escena y vota entre ellas: una sola foto no
+alcanza para una lectura confiable (ver DECISIONS.md, entrada de votación).
+Cuando las fotos no se ponen de acuerdo sobre una perilla, se devuelve esa
+perilla con value=null en vez de inventar un número — para un usuario que no
+ve, una respuesta incorrecta dicha con seguridad es peor que "no pude leerla".
+
+Uso: python3 detect_knobs.py <img1> [img2 ...]
 Salida (stdout, JSON):
-  Éxito: {"knobs": [{"label": "Perilla 1", "value": 3}, ...]}  (value = hora 1-12)
+  Éxito: {"knobs": [{"label": "Arriba izquierda", "value": 3, "agreement": 4}, ...],
+          "framesCaptured": 5, "framesUsed": 4}
+         value es null si no hubo acuerdo suficiente; agreement es sobre framesUsed.
   Error: {"error": "..."}  (exit code 1)
 """
 import sys
 import json
 import math
+import statistics
+from collections import Counter, defaultdict
+
 import cv2
 import numpy as np
 
@@ -44,10 +55,14 @@ HOUGH_MAX_RADIUS = 120
 # detecciones de distintas pasadas de Hough se consideran la misma perilla
 # física. El piso absoluto es necesario porque el radio que entrega Hough
 # para perillas glossy/oscuras es poco confiable (varía 2x+ entre fotos de
-# la misma perilla física), así que un umbral puramente relativo a r a veces
-# no alcanza para fusionar dos detecciones de la misma perilla.
+# la misma perilla física).
+#
+# El piso estaba en 150 px, MÁS del doble de HOUGH_MIN_DIST: en una grilla 2x2
+# con perillas de ~60 px de radio, dos perillas vecinas caen dentro de esos
+# 150 px y se fusionaban en una sola. Medido sobre 92 fotos reales, bajarlo a
+# 110 px sube las detecciones correctas de 4 perillas del 46% al 58%.
 MERGE_DIST_RATIO = 0.5
-MERGE_DIST_MIN_PX = 150
+MERGE_DIST_MIN_PX = 110
 
 # Brillo medio máximo para considerar un círculo como perilla. Las perillas
 # de pedal son casi siempre de plástico negro/oscuro; partes metálicas
@@ -62,21 +77,58 @@ KNOB_MAX_MEAN = 70
 OUTLIER_DIST_RATIO = 2.5
 OUTLIER_MIN_DIST_PX = 150
 
-# Banda ABSOLUTA (en píxeles, sobre WORK_WIDTH=1000) donde se busca la marca
-# indicadora, en vez de una fracción del radio detectado por Hough — ese radio
-# no es confiable (ver MERGE_DIST_MIN_PX), así que atarse a él hace que la
-# búsqueda mire el anillo equivocado del knob. La ventana desliza dentro de
-# esta banda en ángulo y en radio; el promedio sobre la ventana evita que
-# ruido de un solo píxel domine la decisión.
-POINTER_INNER_R_PX = 30
-POINTER_OUTER_R_PX = 115
-POINTER_WINDOW_PX = 18
+# Banda donde se busca la marca indicadora, RELATIVA al radio detectado.
+#
+# Antes era una banda absoluta de 30-115 px. Medido sobre 92 fotos reales, el
+# radio de las perillas detectadas va de 45 a 110 px (mediana 63): la banda fija
+# excedía el radio de la propia perilla en las 280 detecciones, o sea que el
+# algoritmo SIEMPRE terminaba mirando el panel del pedal, la serigrafía blanca
+# ("SUB", "SUB 2") y hasta la mesa de madera del fondo, que son más brillantes
+# que la marca. Las horas que reportaba eran, en los hechos, la dirección de lo
+# más brillante alrededor de la perilla.
+#
+# La marca vive cerca del BORDE de la cara superior (~0.6-1.1 del radio
+# detectado), no en el centro: la perilla se ve en perspectiva y su cara
+# superior queda desplazada respecto de la silueta.
+POINTER_INNER_FRAC = 0.60
+POINTER_OUTER_FRAC = 1.15
 POINTER_ANGLE_STEP_DEG = 2
-MIN_POINTER_CONTRAST = 15
+
+# Separación angular contra la que se compara cada rayo para puntuarlo.
+# La marca es una LÍNEA fina: brilla mucho más que sus vecinos angulares.
+# Un reflejo especular sobre el plástico glossy es ancho, así que brilla
+# parecido a sus vecinos y se cancela. Puntuar por brillo absoluto (como
+# antes) no distingue una cosa de la otra; puntuar por contraste lateral sí.
+POINTER_LATERAL_DELTA_DEG = 20
+
+# Contraste lateral mínimo para aceptar que hay una marca. Medido sobre las
+# 313 detecciones de las fotos reales: el percentil 1 está en 29 y la mediana
+# en 122, así que 30 descarta solo los círculos sin marca visible sin recortar
+# lecturas buenas. No hace falta ser más estricto acá: de la incertidumbre se
+# encarga la votación entre fotos.
+MIN_POINTER_CONTRAST = 30
 
 # Fracción del radio promedio usada para agrupar perillas en la misma fila
 # al ordenarlas (layouts en grilla, ej. 2x2, son comunes en pedales reales).
 ROW_GROUP_RATIO = 0.6
+
+# Votación: cuántas de las fotos recibidas tienen que coincidir en la misma
+# hora para reportarla. Medido sobre las fotos reales, con 5 fotos y mayoría
+# de 3 el sistema responde en el 80% de las perillas y acierta el 93% de las
+# veces que responde; con una sola foto acierta el 68% y nunca se abstiene.
+MIN_AGREEMENT = 3
+
+# Nombres de posición en la grilla. Se prefiere una etiqueta espacial
+# ("Arriba izquierda") sobre un índice ("Perilla 2") porque el índice no es
+# una identidad estable: si una foto detecta 3 perillas y la siguiente 4,
+# "Perilla 2" pasa a referirse a otra perilla física y el usuario que no ve
+# no tiene forma de notarlo. La posición en el panel sí es estable.
+ROW_NAMES = {1: [''], 2: ['Arriba', 'Abajo']}
+COL_NAMES = {
+    1: [''],
+    2: ['izquierda', 'derecha'],
+    3: ['izquierda', 'centro', 'derecha'],
+}
 
 
 def fail(message: str) -> None:
@@ -118,35 +170,37 @@ def circular_mask_mean(gray: np.ndarray, cx: int, cy: int, r: int) -> float:
     return float(cv2.mean(gray, mask=mask)[0])
 
 
-def detect_pointer_angle(gray: np.ndarray, cx: int, cy: int, knob_mean: float):
-    # Busca, en ángulo y en radio (dentro de la banda absoluta), la ventana
-    # con mayor brillo PROMEDIO por sobre el brillo medio del knob.
-    #
-    # Solo se buscan excursiones hacia el brillo (no abs(diff)): la marca
-    # indicadora es siempre blanca/clara. Estas perillas tienen una sombra
-    # oscura donde la base cilíndrica se junta con el panel del pedal, que
-    # también es "alto contraste" respecto al promedio — con abs(diff) el
-    # algoritmo a veces enganchaba esa sombra en vez de la marca real,
-    # dando lecturas opuestas (~180°) de forma intermitente entre fotos
-    # de la MISMA perilla física sin tocar. Ver DECISIONS.md.
+def ray_mean(gray: np.ndarray, cx: int, cy: int, r: int, angle_deg: float) -> float:
+    """Brillo promedio a lo largo de un rayo, dentro de la banda de la marca."""
     height, width = gray.shape
-    best_angle, best_score = None, -1e9
+    cos_a, sin_a = math.cos(math.radians(angle_deg)), math.sin(math.radians(angle_deg))
+    samples = []
+    for rr in range(int(POINTER_INNER_FRAC * r), int(POINTER_OUTER_FRAC * r)):
+        x, y = int(cx + rr * cos_a), int(cy + rr * sin_a)
+        if 0 <= y < height and 0 <= x < width:
+            samples.append(float(gray[y, x]))
+    return float(np.mean(samples)) if samples else 0.0
 
-    for angle_deg in range(0, 360, POINTER_ANGLE_STEP_DEG):
-        rad = math.radians(angle_deg)
-        cos_a, sin_a = math.cos(rad), math.sin(rad)
-        for win_start in range(POINTER_INNER_R_PX, POINTER_OUTER_R_PX - POINTER_WINDOW_PX, 6):
-            samples = []
-            for rr in range(win_start, win_start + POINTER_WINDOW_PX, 3):
-                x = int(cx + rr * cos_a)
-                y = int(cy + rr * sin_a)
-                if 0 <= y < height and 0 <= x < width:
-                    samples.append(gray[y, x])
-            if not samples:
-                continue
-            score = float(np.mean(samples)) - knob_mean
-            if score > best_score:
-                best_score, best_angle = score, angle_deg
+
+def detect_pointer_angle(gray: np.ndarray, cx: int, cy: int, r: int):
+    """Devuelve (ángulo, contraste) del rayo que mejor se comporta como línea.
+
+    El puntaje de cada rayo es su brillo menos el de sus vecinos angulares:
+    premia estructuras finas (la marca) y castiga manchas anchas (los reflejos
+    del plástico brillante), que antes ganaban por brillo absoluto.
+    """
+    profile = {
+        angle: ray_mean(gray, cx, cy, r, angle)
+        for angle in range(0, 360, POINTER_ANGLE_STEP_DEG)
+    }
+
+    best_angle, best_score = None, -1e9
+    for angle, value in profile.items():
+        left = profile[(angle - POINTER_LATERAL_DELTA_DEG) % 360]
+        right = profile[(angle + POINTER_LATERAL_DELTA_DEG) % 360]
+        score = value - 0.5 * (left + right)
+        if score > best_score:
+            best_angle, best_score = angle, score
 
     return best_angle, best_score
 
@@ -175,8 +229,8 @@ def drop_spatial_outliers(detected: list[dict]) -> list[dict]:
     return [k for k, d in zip(detected, dists) if d <= threshold]
 
 
-def order_grid(knobs: list[dict]) -> list[dict]:
-    """Ordena perillas por fila (arriba->abajo) y, dentro de cada fila, izquierda->derecha.
+def group_rows(knobs: list[dict]) -> list[list[dict]]:
+    """Agrupa perillas en filas (arriba->abajo), cada una ordenada izq->der.
 
     Layouts en grilla (ej. 2x2) son comunes en pedales reales; ordenar solo
     por x mezclaría columnas de filas distintas de forma impredecible.
@@ -194,14 +248,34 @@ def order_grid(knobs: list[dict]) -> list[dict]:
         else:
             rows.append([k])
 
-    ordered: list[dict] = []
     for row in rows:
         row.sort(key=lambda k: k["cx"])
-        ordered.extend(row)
-    return ordered
+    return rows
 
 
-def detect_knobs_at_width(img: np.ndarray, work_width: int) -> list[dict]:
+def position_labels(rows: list[list[dict]]) -> list[str]:
+    """Etiqueta cada perilla por su lugar en el panel, en orden de lectura."""
+    row_words = ROW_NAMES.get(len(rows))
+    labels: list[str] = []
+    index = 0
+
+    for row_i, row in enumerate(rows):
+        col_words = COL_NAMES.get(len(row))
+        for col_i in range(len(row)):
+            index += 1
+            if row_words is None or col_words is None:
+                # Layout fuera de los casos cubiertos (ej. 3 filas, 4 columnas):
+                # se cae al índice, menos útil pero nunca ambiguo dentro de una
+                # misma respuesta.
+                labels.append(f"Perilla {index}")
+                continue
+            text = f"{row_words[row_i]} {col_words[col_i]}".strip()
+            labels.append(text[:1].upper() + text[1:] if text else f"Perilla {index}")
+
+    return labels
+
+
+def detect_frame_at_width(img: np.ndarray, work_width: int) -> list[dict]:
     scale = work_width / img.shape[1]
     img = cv2.resize(img, (work_width, int(img.shape[0] * scale)))
 
@@ -222,43 +296,96 @@ def detect_knobs_at_width(img: np.ndarray, work_width: int) -> list[dict]:
         + detect_circles_pass(gray_eq)
         + detect_circles_pass(gray_clahe)
     )
-    circles = merge_candidates(all_candidates)
 
     detected = []
-    for x, y, r in circles:
-        knob_mean = circular_mask_mean(gray, x, y, r)
-        if knob_mean >= KNOB_MAX_MEAN:
+    for x, y, r in merge_candidates(all_candidates):
+        if circular_mask_mean(gray, x, y, r) >= KNOB_MAX_MEAN:
             continue  # parte metálica/reflectante o fondo, no una perilla
-        angle, score = detect_pointer_angle(gray, x, y, knob_mean)
+        angle, score = detect_pointer_angle(gray, x, y, r)
         if angle is None or score < MIN_POINTER_CONTRAST:
             continue  # sin marca clara: se descarta en vez de inventar un valor
         detected.append({"cx": x, "cy": y, "r": r, "value": angle_to_clock_hour(angle)})
 
-    detected = drop_spatial_outliers(detected)
-    return order_grid(detected)
+    return drop_spatial_outliers(detected)
+
+
+def detect_frame(img: np.ndarray) -> list[list[dict]]:
+    """Detecta las perillas de UNA foto y las devuelve agrupadas por filas."""
+    detected = detect_frame_at_width(img, WORK_WIDTH_BASE)
+    if len(detected) < MIN_KNOBS_BEFORE_FALLBACK:
+        fallback = detect_frame_at_width(img, WORK_WIDTH_FALLBACK)
+        if len(fallback) > len(detected):
+            detected = fallback
+    return group_rows(detected)
+
+
+def vote(frames: list[list[list[dict]]]) -> list[dict]:
+    """Vota la hora de cada perilla entre las fotos que coinciden en el layout.
+
+    Solo se votan las fotos cuyo layout coincide con el más frecuente: si una
+    foto detectó 3 perillas y otra 4, sus posiciones no son comparables entre
+    sí y mezclarlas produciría exactamente el corrimiento de identidad que la
+    votación intenta evitar.
+    """
+    layouts = Counter(tuple(len(row) for row in f) for f in frames if f)
+    if not layouts:
+        return [], 0
+    layout, _ = layouts.most_common(1)[0]
+
+    usable = [f for f in frames if tuple(len(row) for row in f) == layout]
+    labels = position_labels(usable[0])
+
+    by_position: dict[int, list[int]] = defaultdict(list)
+    for frame in usable:
+        flat = [k for row in frame for k in row]
+        for i, knob in enumerate(flat):
+            by_position[i].append(knob["value"])
+
+    knobs = []
+    for i, label in enumerate(labels):
+        values = by_position.get(i, [])
+        if values:
+            value, agreement = Counter(values).most_common(1)[0]
+        else:
+            value, agreement = None, 0
+        knobs.append(
+            {
+                "label": label,
+                # Sin acuerdo suficiente se devuelve null: la UI lo comunica como
+                # "no pude leerla con confianza" en vez de arriesgar un número.
+                "value": value if agreement >= MIN_AGREEMENT else None,
+                "agreement": agreement,
+            }
+        )
+    return knobs, len(usable)
 
 
 def main() -> None:
     if len(sys.argv) < 2:
-        fail("Falta el argumento de ruta de imagen")
+        fail("Faltan las rutas de las imágenes")
 
-    image_path = sys.argv[1]
-    img = cv2.imread(image_path)
-    if img is None:
-        fail("No se pudo leer la imagen")
+    frames = []
+    for path in sys.argv[1:]:
+        img = cv2.imread(path)
+        if img is None:
+            continue
+        frames.append(detect_frame(img))
 
-    ordered = detect_knobs_at_width(img, WORK_WIDTH_BASE)
-    if len(ordered) < MIN_KNOBS_BEFORE_FALLBACK:
-        ordered_fallback = detect_knobs_at_width(img, WORK_WIDTH_FALLBACK)
-        if len(ordered_fallback) > len(ordered):
-            ordered = ordered_fallback
+    if not frames:
+        fail("No se pudo leer ninguna de las imágenes")
 
-    if not ordered:
-        fail("No se detectaron perillas en la imagen. Verificá el encuadre, la distancia y la iluminación.")
+    knobs, frames_used = vote(frames)
+    if not knobs:
+        fail(
+            "No se detectaron perillas en la imagen. "
+            "Verificá el encuadre, la distancia y la iluminación."
+        )
 
-    knobs = [{"label": f"Perilla {i + 1}", "value": k["value"]} for i, k in enumerate(ordered)]
-
-    print(json.dumps({"knobs": knobs}))
+    print(
+        json.dumps(
+            {"knobs": knobs, "framesCaptured": len(frames), "framesUsed": frames_used}
+        )
+    )
     sys.exit(0)
 
 

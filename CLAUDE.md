@@ -134,6 +134,7 @@ Este proyecto es un TFI académico. La documentación sirve de evidencia del pro
 | `claude-docs/VALIDACIONES-MANUALES.md` | Checklist paso a paso de las 6 validaciones manuales requeridas por el enunciado del TFI. |
 | `claude-docs/AFINADOR.md` | Funcionamiento técnico de `/afinador`: stack, pipeline de audio, YIN y thresholds, suavizado, modos y narración TTS. |
 | `claude-docs/EVAL-AFINADOR.md` | Evaluación heurística crítica de `/afinador`: hallazgos de accesibilidad y diseño/UX priorizados con evidencia archivo:línea. |
+| `claude-docs/PEDAL.md` | Funcionamiento técnico de `/pedal`: pipeline de visión, arreglos medidos del detector, votación entre capturas y limitaciones. |
 | `claude-docs/OCR-PARTITURA.md` | Funcionamiento técnico de `/api/ocr`: por qué Tesseract y no oemer, pipeline, whitelist de cifrado y capas de filtrado. |
 
 ### Carpeta `claude-docs/`

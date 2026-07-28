@@ -43,6 +43,33 @@ Mantiene el procesamiento local sin dependencias de servicios externos ni costos
 
 ---
 
+## 2026-07-28 — Votación entre capturas y abstención explícita en /pedal
+
+**Decisión:** `/pedal` deja de detectar sobre una sola foto. El cliente toma una ráfaga de **5 capturas separadas 400 ms**, `detect_knobs.py` corre la detección sobre cada una y vota por posición. Una perilla se reporta solo si **al menos 3 capturas coinciden**; si no, se devuelve `value: null` y la UI dice "no pude leerla con confianza". Además se corrigieron tres defectos del detector y las etiquetas pasaron de índices a posiciones del panel.
+
+**Razones:**
+Medido sobre las 92 fotos reales de `tmp/debug_captures/`, la detección de una sola foto acertaba ~68% de las veces y **nunca se abstenía**: el 32% restante eran errores dichos con total seguridad. Fotografiando el pedal quieto, la misma perilla se leía distinto entre tomas consecutivas.
+
+Con 5 capturas y mayoría de 3, el sistema responde en el 80% de las perillas y acierta el 93% de las veces que responde. Se evaluaron otras combinaciones (2 de 5 → 87% de acierto; 4 de 5 → 98% pero solo responde el 44%; 5 de 7 → 99% respondiendo el 51%). Se eligió 3 de 5 como el mejor equilibrio entre cobertura y confiabilidad.
+
+**Por qué la abstención es lo más importante del cambio:** un usuario que ve descarta una lectura absurda de un vistazo; uno que no ve, no. Una respuesta incorrecta presentada con seguridad no es solo un error de precisión, es un problema de accesibilidad — le quita a esa persona la posibilidad de detectar el error que cualquier otra corregiría con una mirada. Por eso se prefirió bajar la cobertura al 80% antes que seguir contestando siempre.
+
+**Las capturas van separadas en el tiempo** (400 ms, no cuadros consecutivos del stream) porque dos cuadros seguidos son casi idénticos y votar entre ellos no aportaría nada: hacen falta puntos de vista ligeramente distintos, y el micromovimiento natural de la mano los provee.
+
+**Los tres defectos corregidos en el detector** (detalle y mediciones en `claude-docs/PEDAL.md`):
+
+1. **La banda de búsqueda de la marca miraba fuera de la perilla.** Era absoluta (30-115 px) contra radios reales de 45-110 px: excedía el radio de la propia perilla en las 280 detecciones, así que el algoritmo medía la dirección de lo más brillante alrededor —serigrafía, cuerpo del pedal, la mesa de madera— y no la marca. Ahora es relativa al radio (0.60-1.15 r).
+2. **Puntuar por brillo absoluto no distingue la marca de un reflejo.** La marca es una línea fina, un reflejo especular es una mancha ancha. El puntaje pasó a ser el brillo del rayo menos el de sus vecinos angulares a ±20°, que premia estructuras finas y cancela manchas anchas. Consistencia: 59% → 67%.
+3. **`MERGE_DIST_MIN_PX` era 150 px, más del doble de `HOUGH_MIN_DIST`**, así que fusionaba perillas vecinas distintas en una sola. Bajado a 110 px: las detecciones correctas de 4 perillas suben del 46% al 58%.
+
+**Etiquetas por posición, no por índice:** antes eran "Perilla 1", "Perilla 2". Como el conteo variaba entre fotos, "Perilla 2" pasaba a referirse a otra perilla física y el usuario no tenía forma de notarlo. Ahora es "Arriba izquierda". Por el mismo motivo, la votación solo compara fotos con el mismo layout: mezclar una foto de 3 perillas con una de 4 produciría justo ese corrimiento.
+
+**Se removió el bloque de debug** que guardaba cada foto capturada en `tmp/debug_captures/` (y su volumen en `docker-compose.yml`). Ya estaba marcado como temporal en el código, y con ráfagas de 5 habría quintuplicado lo que escribe a disco.
+
+**Limitación conocida:** queda un sesgo sistemático por perspectiva —la cara superior de la perilla se ve como elipse, no como círculo— que la votación no corrige porque no es ruido aleatorio. Los umbrales están calibrados contra un solo modelo de pedal. Y la ganancia de la votación se midió sobre fotos separadas por segundos con el usuario reencuadrando; con 400 ms la decorrelación es menor, así que la mejora real va a estar por debajo del 93% simulado.
+
+---
+
 ## 2026-07-28 — Canal único de audio extendido a /pedal y /partitura
 
 **Decisión:** El patrón de canal único que se había aplicado solo a `/afinador` (ver entrada del 2026-06-30) pasa a regir en toda la app. En `/pedal`, una función `announce` centraliza el texto y alimenta los dos canales posibles: el TTS de la app como primario y una única región `aria-live` como fallback, que queda en `off` mientras el navegador soporte Web Speech. En `/partitura`, la región `sr-only` es la única live region de la pantalla. Se removieron el `role="alert"` del error de `/pedal`, el `aria-live` que envolvía a `PedalInfo`, y el `role="alert"` del error de `HarmonyList`.

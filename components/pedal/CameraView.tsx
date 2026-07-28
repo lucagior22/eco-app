@@ -12,15 +12,29 @@
 import { useEffect, useRef } from 'react'
 import { useCamera } from '@/hooks/useCamera'
 
-export type DetectStatus = 'idle' | 'loading' | 'done' | 'error'
+export type DetectStatus = 'idle' | 'capturing' | 'loading' | 'done' | 'error'
+
+// Se toma una ráfaga en vez de una sola foto porque el detector vota entre las
+// capturas para descartar lecturas inconsistentes. Van separadas en el tiempo a
+// propósito: cuadros consecutivos del stream son casi idénticos y votar entre
+// ellos no aportaría nada — es el micromovimiento natural de la mano entre una
+// toma y la siguiente lo que da puntos de vista distintos de la misma perilla.
+const BURST_FRAMES = 5
+const BURST_INTERVAL_MS = 400
 
 interface CameraViewProps {
   status: DetectStatus
-  onCapture: (file: File) => void
+  onCapture: (files: File[]) => void
+  onBurstStart?: () => void
   onReady?: (torchSupported: boolean) => void
 }
 
-export default function CameraView({ status, onCapture, onReady }: CameraViewProps) {
+export default function CameraView({
+  status,
+  onCapture,
+  onBurstStart,
+  onReady,
+}: CameraViewProps) {
   const { videoRef, isActive, error, torchSupported, torchOn, toggleTorch } = useCamera()
   const buttonRef = useRef<HTMLButtonElement>(null)
 
@@ -32,23 +46,39 @@ export default function CameraView({ status, onCapture, onReady }: CameraViewPro
     }
   }, [isActive]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function captureFrame() {
+  function grabFrame(): Promise<File | null> {
     const video = videoRef.current
-    if (!video) return
+    if (!video) return Promise.resolve(null)
 
     const canvas = document.createElement('canvas')
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
     canvas.getContext('2d')?.drawImage(video, 0, 0)
 
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return
-        onCapture(new File([blob], `pedal_${Date.now()}.jpg`, { type: 'image/jpeg' }))
-      },
-      'image/jpeg',
-      0.92
-    )
+    return new Promise((resolve) => {
+      canvas.toBlob(
+        (blob) => {
+          resolve(
+            blob ? new File([blob], `pedal_${Date.now()}.jpg`, { type: 'image/jpeg' }) : null
+          )
+        },
+        'image/jpeg',
+        0.92
+      )
+    })
+  }
+
+  async function captureBurst() {
+    onBurstStart?.()
+    const files: File[] = []
+
+    for (let i = 0; i < BURST_FRAMES; i++) {
+      if (i > 0) await new Promise((r) => setTimeout(r, BURST_INTERVAL_MS))
+      const file = await grabFrame()
+      if (file) files.push(file)
+    }
+
+    onCapture(files)
   }
 
   if (error) {
@@ -66,6 +96,7 @@ export default function CameraView({ status, onCapture, onReady }: CameraViewPro
   }
 
   const detected = status === 'done'
+  const busy = status === 'capturing' || status === 'loading'
 
   return (
     <div className="flex flex-col gap-4">
@@ -97,7 +128,7 @@ export default function CameraView({ status, onCapture, onReady }: CameraViewPro
         <button
           type="button"
           onClick={toggleTorch}
-          disabled={!isActive}
+          disabled={!isActive || busy}
           aria-pressed={torchOn}
           aria-label={torchOn ? 'Apagar flash' : 'Encender flash'}
           className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-6 py-3 font-semibold text-(--color-text-primary) focus:outline-2 focus:outline-offset-2 focus:outline-(--color-accent) disabled:cursor-not-allowed disabled:opacity-50"
@@ -109,19 +140,27 @@ export default function CameraView({ status, onCapture, onReady }: CameraViewPro
       <button
         ref={buttonRef}
         type="button"
-        onClick={captureFrame}
-        disabled={!isActive || status === 'loading'}
-        aria-busy={status === 'loading'}
+        onClick={captureBurst}
+        disabled={!isActive || busy}
+        aria-busy={busy}
         aria-label={
-          status === 'loading'
-            ? 'Analizando perillas del pedal'
-            : detected
-              ? 'Detectar pedal de nuevo con la cámara'
-              : 'Detectar pedal con la cámara'
+          status === 'capturing'
+            ? 'Tomando fotos del pedal, mantené la cámara apuntando'
+            : status === 'loading'
+              ? 'Analizando perillas del pedal'
+              : detected
+                ? 'Detectar pedal de nuevo con la cámara'
+                : 'Detectar pedal con la cámara'
         }
         className="w-full rounded-lg bg-[var(--color-accent)] px-6 py-3 font-semibold text-white focus:outline-2 focus:outline-offset-2 focus:outline-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {status === 'loading' ? 'Analizando…' : detected ? 'Detectar de nuevo' : 'Detectar pedal'}
+        {status === 'capturing'
+          ? 'Tomando fotos…'
+          : status === 'loading'
+            ? 'Analizando…'
+            : detected
+              ? 'Detectar de nuevo'
+              : 'Detectar pedal'}
       </button>
     </div>
   )
