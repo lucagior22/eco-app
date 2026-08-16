@@ -76,7 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Navigation />
           {/* Offset para el nav: en mobile padding-bottom para la bottom bar,
               en desktop margin-left para la sidebar */}
-          <main id="main-content" className="flex-1 pb-[72px] md:ml-20 md:pb-0" tabIndex={-1}>
+          <main id="main-content" className="flex-1 pb-(--nav-height) md:ml-20 md:pb-0" tabIndex={-1}>
             {children}
           </main>
         </SettingsProvider>

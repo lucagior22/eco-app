@@ -246,6 +246,6 @@ docker-compose up
 | `/`                    | —              | Redirige a `/afinador`         |
 | `/afinador`            | Afinador       | Mic → pitch → TTS              |
 | `/partitura`           | Leer partitura | Foto/archivo → OCR → acordes   |
-| `/partitura/metronomo` | Metrónomo      | BPM + audio/háptico            |
+| `/metronomo`           | Metrónomo      | BPM + audio/háptico            |
 | `/pedal`               | Detectar pedal | Cámara → mock detección → info |
 | `/ajustes`             | Ajustes        | Tema, fuente, velocidad TTS    |

@@ -21,6 +21,16 @@ function PartituraIcon() {
   )
 }
 
+function MetronomoIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 3h4l4 18H6z" />
+      <line x1="7" y1="16" x2="17" y2="16" />
+      <line x1="12" y1="16" x2="16" y2="6" />
+    </svg>
+  )
+}
+
 function PedalIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -57,6 +67,7 @@ function AjustesIcon() {
 
 const NAV_ITEMS = [
   { href: '/partitura', label: 'Partitura', icon: <PartituraIcon /> },
+  { href: '/metronomo', label: 'Metrónomo', icon: <MetronomoIcon /> },
   { href: '/pedal', label: 'Pedal', icon: <PedalIcon /> },
   { href: '/afinador', label: 'Afinador', icon: <AfinadorIcon /> },
   { href: '/ajustes', label: 'Ajustes', icon: <AjustesIcon /> },
@@ -67,22 +78,24 @@ export function Navigation() {
 
   return (
     <nav aria-label="Navegación principal">
-      <ul className="fixed right-0 bottom-0 left-0 z-40 flex h-[72px] items-center justify-around border-t border-[var(--color-border)] bg-[var(--color-surface)] md:top-0 md:right-auto md:bottom-auto md:h-full md:w-20 md:flex-col md:justify-start md:gap-1 md:border-t-0 md:border-r md:pt-4">
+      <ul className="fixed right-0 bottom-0 left-0 z-40 flex min-h-(--nav-height) items-center justify-around border-t border-[var(--color-border)] bg-[var(--color-surface)] md:top-0 md:right-auto md:bottom-auto md:h-full md:w-20 md:flex-col md:justify-start md:gap-1 md:border-t-0 md:border-r md:pt-4">
         {NAV_ITEMS.map(({ href, label, icon }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
           return (
-            <li key={href}>
+            <li key={href} className="min-w-0 flex-1 md:flex-none">
               <Link
                 href={href}
                 aria-current={isActive ? 'page' : undefined}
-                className={`flex flex-col items-center gap-1 rounded px-2 py-1 text-xs text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)] ${
+                className={`flex w-full flex-col items-center gap-1 rounded px-1 py-1 text-center text-xs text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-primary)] ${
                   isActive
                     ? 'border-b-2 border-[var(--color-accent)] text-[var(--color-accent)]'
                     : ''
                 } md:w-full md:flex-col md:items-center md:rounded-none md:border-b-0 md:py-3 ${isActive ? 'md:border-b-0 md:border-l-2 md:border-[var(--color-accent)]' : ''} `}
               >
                 {icon}
-                <span className="leading-none">{label}</span>
+                {/* El label es el nombre accesible del ítem: con cinco ítems y la fuente en xl
+                    se parte en dos líneas (hyphens-auto corta por sílaba en es), nunca se trunca. */}
+                <span className="leading-tight wrap-break-word hyphens-auto">{label}</span>
               </Link>
             </li>
           )

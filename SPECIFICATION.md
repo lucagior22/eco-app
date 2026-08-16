@@ -158,11 +158,12 @@ eco-app/
 
 ### Componente Navigation
 
-Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
+Cinco ítems siempre visibles: Partitura, Metrónomo, Pedal, Afinador, Ajustes.
 
 ```
 Ícono    Etiqueta   Ruta
 📄       Partitura  /partitura
+🎼       Metrónomo  /metronomo
 🎛️       Pedal      /pedal
 🎵       Afinador   /afinador
 ⚙️       Ajustes    /ajustes
@@ -178,7 +179,9 @@ Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
 - Mobile: ruta separada `/partitura/metronomo`, botón back con flecha ←
 - Desktop: panel derecho inline dentro de `/partitura` (split 50/50)
 
-> **Pendiente:** el metrónomo deja de depender de Partitura y se suma a la barra de navegación como quinto ítem, entre Partitura y Pedal (ver §6.3). Queda por verificar que los cinco ítems entren sin recortar el label en 375 px con la fuente en tamaño muy grande: el texto es el nombre accesible de cada ítem, así que el ajuste tiene que salir del ícono y el padding, nunca de truncar la palabra.
+> **Implementado:** el metrónomo no depende de Partitura: es el quinto ítem de la barra, entre Partitura y Pedal, en `/metronomo` (ver §6.3). No hay botón back ni panel inline en desktop; la pantalla es la misma en ambos anchos.
+>
+> Para que los cinco ítems entren en 375 px sin recortar el label —que es el nombre accesible de cada ítem— cada ítem toma un quinto del ancho (`flex-1 min-w-0`) y el texto se parte en dos líneas con `hyphens-auto`, que en `lang="es"` corta por sílaba. La barra crece de 72 px a 88 px solo con la fuente en tamaño muy grande, vía la variable `--nav-height` que el `<main>` usa como `padding-bottom`. Nunca se trunca ni se achica el texto.
 
 ---
 
@@ -247,6 +250,8 @@ Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
 5. Al completar: mostrar lista de acordes detectados como texto
 6. Botón "Metrónomo": navega a `/partitura/metronomo` (mobile) o muestra panel (desktop)
 
+> **Implementado:** el paso 6 ya no existe. El metrónomo es una pantalla de primer nivel accesible desde la barra de navegación (§5), no un destino de `/partitura`.
+
 **Endpoint `/api/ocr`:**
 
 - Método: POST, multipart/form-data, campo `image`
@@ -268,11 +273,11 @@ Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
 
 ---
 
-### 6.3 Metrónomo (`/partitura/metronomo`)
+### 6.3 Metrónomo (`/metronomo`)
 
-> **Pendiente:** el metrónomo pasa a ser una pantalla de primer nivel en `/metronomo`, con ícono propio en la barra de navegación y redirect permanente desde `/partitura/metronomo`. En el test de usabilidad los cinco participantes lo buscaron en la barra inferior antes que dentro de Partitura, y uno no lo encontró. Al dejar de ser una pantalla anidada, desaparecen el enlace "Ir al metrónomo" de `/partitura` y el botón "Volver" de la pantalla del metrónomo. Ver INFORME.md §1.4.
+> **Implementado:** el metrónomo es una pantalla de primer nivel en `/metronomo`, con ícono propio en la barra de navegación y redirect permanente (308) desde `/partitura/metronomo`. En el test de usabilidad los cinco participantes lo buscaron en la barra inferior antes que dentro de Partitura, y uno no lo encontró. Al dejar de ser una pantalla anidada desaparecieron el enlace "Ir al metrónomo" de `/partitura` y el botón "Volver" de la pantalla del metrónomo. Ver INFORME.md §1.4 y DECISIONS.md.
 
-> **Pendiente:** se agrega el control de vibración dentro de la pantalla del metrónomo, además del que ya está en `/ajustes`. Es el mismo estado de `SettingsContext` expuesto en dos lugares: los cinco participantes lo buscaron acá y una participante abandonó la tarea sin encontrarlo.
+> **Implementado:** el control de vibración está también dentro de la pantalla del metrónomo, además del de `/ajustes`. Es el mismo estado de `SettingsContext` expuesto en dos lugares: los cinco participantes lo buscaron acá y una participante abandonó la tarea sin encontrarlo.
 
 **Propósito:** metrónomo con BPM ajustable, audio y háptico.
 

@@ -5,7 +5,6 @@
 // región aria-live como fallback. HarmonyList y ScoreUpload no anuncian por su cuenta.
 
 import { useState, useCallback } from 'react'
-import Link from 'next/link'
 import { PageHeader } from '@/components/layout/PageHeader'
 import LiveRegion from '@/components/a11y/LiveRegion'
 import ScoreUpload from '@/components/score/ScoreUpload'
@@ -107,29 +106,6 @@ export default function PartituraContent() {
           errorMessage={errorMessage}
           onNarrate={handleNarrate}
         />
-
-        <div className="pt-2">
-          <Link
-            href="/partitura/metronomo"
-            aria-label="Ir al metrónomo"
-            className="flex items-center justify-between rounded-lg border border-(--color-border) bg-(--color-surface) px-4 py-3 text-(--color-text-primary) focus:outline-2 focus:outline-(--color-accent) focus:outline-offset-2"
-          >
-            <span className="font-medium">Metrónomo</span>
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </Link>
-        </div>
       </div>
     </>
   )

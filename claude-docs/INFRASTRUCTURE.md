@@ -36,7 +36,7 @@ app/
 ├── sw.ts               # REAL: service worker de Serwist
 ├── afinador/page.tsx          # placeholder (PageHeader + title)
 ├── partitura/page.tsx         # placeholder
-├── partitura/metronomo/page.tsx  # placeholder
+├── metronomo/page.tsx         # placeholder
 ├── pedal/page.tsx             # placeholder
 ├── ajustes/page.tsx           # placeholder
 └── api/ocr/route.ts           # placeholder: POST → 501

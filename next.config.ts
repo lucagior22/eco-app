@@ -11,6 +11,11 @@ const withSerwist = withSerwistInit({
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['192.168.100.4'],
+  // El metrónomo dejó de ser una pantalla anidada de /partitura (ver DECISIONS.md).
+  // 308 para no romper enlaces guardados ni las referencias de la documentación anterior.
+  async redirects() {
+    return [{ source: '/partitura/metronomo', destination: '/metronomo', permanent: true }]
+  },
 }
 
 export default withSerwist(nextConfig)

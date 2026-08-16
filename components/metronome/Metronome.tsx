@@ -15,6 +15,7 @@ import { useSettings } from '@/contexts/SettingsContext'
 import { useMetronome } from '@/hooks/useMetronome'
 import LiveRegion from '@/components/a11y/LiveRegion'
 import SettingCarousel from '@/components/settings/SettingCarousel'
+import { VibrationSetting } from '@/components/settings/VibrationSetting'
 import { useAnnouncer } from '@/hooks/useAnnouncer'
 import {
   BPM_MIN,
@@ -152,7 +153,7 @@ export default function Metronome() {
         })}
       </div>
 
-      <div className="w-full max-w-xs">
+      <div className="flex w-full max-w-xs flex-col gap-4">
         <SettingCarousel
           label="Compás"
           options={TIME_SIGNATURE_LABELS}
@@ -160,6 +161,9 @@ export default function Metronome() {
           onChange={handleSignatureChange}
           liveMode="off"
         />
+        {/* Misma preferencia global de SettingsContext que /ajustes, expuesta acá porque es
+            donde los usuarios del test la buscaron. No hay estado duplicado. */}
+        <VibrationSetting announce={announce} />
       </div>
 
       <Button

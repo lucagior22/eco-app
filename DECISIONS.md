@@ -47,9 +47,9 @@ La abstracción se justifica por cantidad de usos: cinco pantallas repitiendo el
 
 ---
 
-## Pendiente — El metrónomo pasa a pantalla de primer nivel
+## 2026-08-16 — El metrónomo pasa a pantalla de primer nivel
 
-**Estado:** decidido, no implementado. Deriva del test de usabilidad (INFORME.md §1.4).
+**Estado:** implementado. Deriva del test de usabilidad (INFORME.md §1.4).
 
 **Decisión:** el metrónomo se mueve de `/partitura/metronomo` a `/metronomo`, con ícono propio en la barra de navegación y redirect permanente desde la ruta anterior. Se eliminan el enlace "Ir al metrónomo" dentro de `/partitura` y el botón "Volver a partitura" de la pantalla del metrónomo. El control de vibración se expone también dentro del metrónomo, además de en `/ajustes`.
 
@@ -59,6 +59,8 @@ La jerarquía original tenía una lógica de dominio: se marca el tempo de la pa
 El mismo criterio explica la duplicación del control de vibración. Es la misma preferencia de `SettingsContext` —no hay estado duplicado ni que sincronizar— expuesta donde el usuario la busca: los cinco la buscaron dentro del metrónomo, y una de ellas abandonó esa parte de la tarea al no encontrarla. Que un ajuste sea global no obliga a que exista en un solo lugar.
 
 Como efecto secundario se corrige un `aria-current` incorrecto: al evaluarse con `pathname.startsWith('/partitura/')`, la navegación marcaba "Partitura" como página actual mientras el usuario estaba en el metrónomo. Con las rutas al mismo nivel, el problema desaparece sin lógica adicional.
+
+**El quinto ítem y el tamaño de fuente.** El label de cada ítem es su nombre accesible, así que no puede truncarse. Con la fuente en tamaño muy grande el `font-size` raíz es 20 px y el label del nav mide 15 px: cinco palabras de hasta nueve letras no entran en una línea de 375 px, y no es un caso borde sino aritmética. Achicar el texto solo en el nav era la salida fácil, pero contradice la preferencia que el usuario eligió justamente para poder leer. Se optó por lo contrario: cada ítem toma un quinto del ancho (`flex-1 min-w-0`) y el label se parte en dos líneas con `hyphens-auto`, que con `lang="es"` corta por sílaba ("Me-trónomo") en lugar de por carácter arbitrario. El alto de la barra se volvió la variable `--nav-height` —72 px, 88 px en tamaño muy grande— que el `<main>` usa como `padding-bottom`, para que la barra más alta no tape el final del contenido. La solución es correcta por construcción y no depende de medir el ancho exacto de cada palabra en cada tipografía.
 
 ---
 

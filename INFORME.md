@@ -337,7 +337,7 @@ Las cinco pantallas están implementadas y operativas. La distinción relevante 
 | ---------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Ajustes (`/ajustes`)               | Completo           | Cinco preferencias persistidas en `localStorage`: tema (4 variantes), tamaño de fuente, familia tipográfica, velocidad del narrador y vibración. |
 | Afinador (`/afinador`)             | Completo           | Detección de pitch con algoritmo YIN sobre Web Audio. Modo automático y modo cuerda por cuerda, histéresis en el umbral de afinado y narración por un canal único. |
-| Metrónomo (`/partitura/metronomo`) | Completo           | Rango de 40 a 220 BPM, pulso por audio y por vibración, con acento en el primer tiempo del compás.                                    |
+| Metrónomo (`/metronomo`)           | Completo           | Rango de 40 a 220 BPM, pulso por audio y por vibración, con acento en el primer tiempo del compás. Control de vibración en la propia pantalla, además del de Ajustes. |
 | Leer partitura (`/partitura`)      | Funcional, precisión irregular | OCR del cifrado de acordes con Tesseract. Devuelve acordes reales sobre lead sheets, pero confunde algunos y omite otros. |
 | Detectar pedal (`/pedal`)          | Funcional, precisión parcial | Detección real de perillas por visión (OpenCV), no simulada. Vota entre 5 capturas y reporta la posición de cada perilla como hora de reloj, o declara explícitamente que no pudo leerla. |
 

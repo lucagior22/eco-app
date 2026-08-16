@@ -56,6 +56,8 @@
 html {
   font-size: 16px;
   font-family: var(--font-hyperlegible), sans-serif;
+  /* Alto de la barra de navegación; el <main> lo usa como padding-bottom. */
+  --nav-height: 72px;
 }
 
 html[data-font-family='hyperlegible'] {
@@ -88,6 +90,9 @@ html[data-font-size='lg'] {
 
 html[data-font-size='xl'] {
   font-size: 20px;
+  /* Con la fuente en muy grande, los cinco labels del nav no entran en una línea
+     en 375px: se parten en dos y la barra necesita el alto extra. */
+  --nav-height: 88px;
 }
 
 body {
