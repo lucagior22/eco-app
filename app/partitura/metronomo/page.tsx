@@ -10,6 +10,8 @@ export const metadata: Metadata = {
 export default function MetronomoPage() {
   return (
     <>
+      <PageHeader title="Metrónomo" subtitle="Ajustá el tempo y practicá con ritmo" />
+      {/* Debajo del header: arriba empujaba el <h1> fuera del tope de la pantalla. */}
       <Link
         href="/partitura"
         aria-label="Volver a partitura"
@@ -20,7 +22,6 @@ export default function MetronomoPage() {
         </svg>
         Volver
       </Link>
-      <PageHeader title="Metrónomo" subtitle="Ajustá el tempo y practicá con ritmo" />
       <div className="p-4">
         <Metronome />
       </div>

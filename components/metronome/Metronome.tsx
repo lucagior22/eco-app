@@ -1,20 +1,21 @@
 'use client'
 
-// Accesibilidad: el display de BPM usa aria-live="polite" para anunciar cambios
-// al presionar +/- (no cambia durante el play, así no satura). El botón Play tiene
-// aria-pressed y alterna su label entre "Iniciar metrónomo" y "Detener metrónomo".
-// Los botones +/- tienen aria-label "Incrementar/Decrementar BPM" y auto-repiten
-// cada 150ms al mantenerse presionados. El selector de compás reutiliza
-// SettingCarousel (role="group" + aria-live). El indicador visual de pulso es
-// aria-hidden: es redundante con el audio y distingue el acento por tamaño, no
-// solo por color. Rango válido 40–220 BPM (§6.3 SPECIFICATION.md).
+// Accesibilidad — canal único de audio (useAnnouncer): BPM, compás e inicio/detención se narran
+// por el TTS de la app, con la región aria-live como fallback. El display grande de BPM y el
+// carrusel de compás no son live regions para no duplicar la voz. El BPM se narra al soltar el
+// botón, no en cada paso: con auto-repeat cada 150ms sería inusable.
+// El botón Play tiene aria-pressed y alterna su label entre "Iniciar metrónomo" y "Detener
+// metrónomo". Los botones +/- tienen aria-label "Incrementar/Decrementar BPM". El indicador
+// visual de pulso es aria-hidden: es redundante con el audio y distingue el acento por tamaño,
+// no solo por color. Rango válido 40–220 BPM (§6.3 SPECIFICATION.md).
 
 import { useCallback, useRef, useState } from 'react'
 import { Button } from 'react-aria-components'
 import { useSettings } from '@/contexts/SettingsContext'
 import { useMetronome } from '@/hooks/useMetronome'
+import LiveRegion from '@/components/a11y/LiveRegion'
 import SettingCarousel from '@/components/settings/SettingCarousel'
-import { speak, cancelSpeech } from '@/lib/tts'
+import { useAnnouncer } from '@/hooks/useAnnouncer'
 import {
   BPM_MIN,
   BPM_MAX,
@@ -55,6 +56,7 @@ export default function Metronome() {
   const [bpm, setBpm] = useState(DEFAULT_BPM)
   const [signatureIndex, setSignatureIndex] = useState(TIME_SIGNATURES.indexOf(4))
   const [isPlaying, setIsPlaying] = useState(false)
+  const { announce, announcement, liveMode } = useAnnouncer()
 
   const beatsPerMeasure = TIME_SIGNATURES[signatureIndex]
 
@@ -69,41 +71,49 @@ export default function Metronome() {
   const { currentBeat } = useMetronome({ bpm, beatsPerMeasure, isPlaying, onBeat })
 
   const holdRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // El valor vive también en un ref para poder narrarlo al soltar el botón: el intervalo de
+  // auto-repeat no ve el estado actualizado de React.
+  const bpmRef = useRef(DEFAULT_BPM)
 
   const startHold = useCallback((delta: number) => {
-    setBpm((prev) => clampBpm(prev + delta))
-    holdRef.current = setInterval(() => {
-      setBpm((prev) => clampBpm(prev + delta))
-    }, HOLD_REPEAT_MS)
+    const step = () => {
+      bpmRef.current = clampBpm(bpmRef.current + delta)
+      setBpm(bpmRef.current)
+    }
+    step()
+    holdRef.current = setInterval(step, HOLD_REPEAT_MS)
   }, [])
 
   const stopHold = useCallback(() => {
     if (holdRef.current) {
       clearInterval(holdRef.current)
       holdRef.current = null
+      announce(`${bpmRef.current} pulsos por minuto`)
     }
-  }, [])
+  }, [announce])
+
+  function handleSignatureChange(index: number) {
+    setSignatureIndex(index)
+    announce(`Compás de ${timeSignatureToSpanish(TIME_SIGNATURES[index])}`)
+  }
 
   function togglePlay() {
-    setIsPlaying((prev) => {
-      const next = !prev
-      if (next) {
-        speak(`${bpm} pulsos por minuto, compás de ${timeSignatureToSpanish(beatsPerMeasure)}`, settings.ttsSpeed)
-      } else {
-        cancelSpeech()
-      }
-      return next
-    })
+    const next = !isPlaying
+    setIsPlaying(next)
+    announce(
+      next
+        ? `${bpm} pulsos por minuto, compás de ${timeSignatureToSpanish(beatsPerMeasure)}`
+        : 'Metrónomo detenido',
+    )
   }
 
   return (
     <div className="flex flex-col items-center gap-10 py-8">
+      <LiveRegion announcement={announcement} liveMode={liveMode} />
+
       <div className="flex flex-col items-center gap-1">
-        <p
-          aria-live="polite"
-          aria-atomic="true"
-          className="text-7xl font-bold tabular-nums text-[var(--color-text-primary)]"
-        >
+        {/* Solo visual: el valor se anuncia por el canal único al soltar +/-. */}
+        <p className="text-7xl font-bold tabular-nums text-[var(--color-text-primary)]">
           {bpm}
         </p>
         <p className="text-sm text-[var(--color-text-secondary)]">pulsos por minuto</p>
@@ -147,7 +157,8 @@ export default function Metronome() {
           label="Compás"
           options={TIME_SIGNATURE_LABELS}
           currentIndex={signatureIndex}
-          onChange={setSignatureIndex}
+          onChange={handleSignatureChange}
+          liveMode="off"
         />
       </div>
 

@@ -8,11 +8,13 @@ el código se reemplaza `Pendiente` por la fecha y se elimina la línea de estad
 
 ---
 
-## Pendiente — Desbloqueo del TTS por gesto del usuario
+## 2026-08-16 — Desbloqueo del TTS por gesto del usuario
 
-**Estado:** decidido, no implementado. Deriva del test de usabilidad (INFORME.md §1.4).
+**Decisión:** `lib/tts.ts` deja de asumir que `speechSynthesis.speak()` se ejecuta siempre. La locución se intenta y se **verifica**: si 250 ms después la síntesis quedó ociosa —no habla ni tiene nada encolado— y ningún `onstart` marcó que arrancó, se da por descartada y el texto se retiene como locución pendiente. Un listener global de `pointerdown`/`keydown`, registrado una sola vez, la emite al primer gesto. Solo se conserva la última pendiente: si hubo varios anuncios antes del gesto, el único vigente es el más reciente.
 
-**Decisión:** `lib/tts.ts` deja de asumir que `speechSynthesis.speak()` se ejecuta siempre. Mientras no haya habido una interacción del usuario en la página, `speak()` retiene el texto como locución pendiente en lugar de emitirlo; un listener global de `pointerdown`/`keydown`, que se registra una sola vez y se remueve al dispararse, marca el estado como desbloqueado y emite lo retenido. Solo se conserva la última locución pendiente: si hubo varios anuncios antes del gesto, el único vigente es el más reciente.
+Verificar en vez de bloquear preventivamente es lo que hace correcto el caso del permiso denegado: el click en "Bloquear" ocurre en el diálogo del navegador, no en la página, así que bajo un candado previo al intento el usuario tenía que tocar la pantalla para enterarse de que el permiso había fallado. Los navegadores de escritorio, además, hablan sin gesto previo; retener ahí sería silencio autoinfligido.
+
+**Dos detalles del wrapper que salieron del mismo problema:** `speak()` se emite un tick después de `cancel()` —en el mismo tick Chrome puede perder la locución nueva, que es lo que dejaba mudo el aviso de permiso denegado cuando pisaba al anterior— y se llama `resume()` antes de hablar, porque el diálogo de permisos le saca el foco a la página y puede dejar la síntesis en pausa.
 
 **Razones:**
 Los navegadores móviles descartan la síntesis de voz que no proviene de un gesto del usuario. El primer anuncio del afinador sale del efecto de montaje de `useTuner`, es decir, antes de cualquier interacción, así que se perdía siempre — y `speak()` no tenía forma de detectarlo, porque la API no reporta el descarte.
@@ -20,6 +22,28 @@ Los navegadores móviles descartan la síntesis de voz que no proviene de un ges
 El efecto medido en el test es desproporcionado respecto de la causa: tres de los cinco participantes concluyeron que el narrador estaba roto. Francisco lo anotó como falla ("no anda el narrador") y Thiago y Mónica lo resolvieron por casualidad, tocando la pantalla. Para una app cuyo canal principal de salida es la voz, arrancar en silencio equivale a arrancar rota.
 
 Retener y reemitir, en lugar de simplemente reintentar, preserva el contenido del anuncio: lo que el usuario escucha al primer toque es el estado real de la pantalla en ese momento, no un mensaje genérico de bienvenida.
+
+**Detalle de implementación:** el `onEnd` de una locución retenida no corre hasta el gesto. Es el callback que en `useTuner` apaga el guard de auto-escucha, así que retenerlo también podría, en teoría, dejar la detección de pitch bloqueada. No ocurre: para llegar a `useTuner` hay que haber tocado el botón de activar micrófono, con lo cual ya hubo gesto. Preservar el `onEnd` en vez de dispararlo al retener mantiene el guard intacto para cuando la locución sí se emite. Reemplazar una locución pendiente por otra sí dispara el `onEnd` de la reemplazada, con la misma semántica que hoy tiene `speechSynthesis.cancel()` sobre una locución en curso.
+
+---
+
+## 2026-08-16 — Canal único de audio en toda la app
+
+**Decisión:** el patrón que se había aplicado a `/afinador`, `/pedal` y (parcialmente) `/partitura` pasa a regir en las cinco pantallas, extraído a dos piezas: el hook `useAnnouncer` —`announce(texto, politeness?, speed?)` como fuente única, que alimenta el TTS propio y publica el mismo texto para la región de fallback— y el componente `LiveRegion`, la única región `aria-live` de cada pantalla. `liveMode` queda en `off` mientras el navegador soporte Web Speech y el narrador esté activo.
+
+Se aplicó donde faltaba: `/partitura` (que anunciaba solo por `aria-live`), el metrónomo (BPM, compás e inicio/detención), `/ajustes` (las cinco preferencias) y los tres errores de cámara y micrófono, que existían únicamente como `role="alert"`.
+
+**Razones:**
+La auditoría posterior al test mostró que el hallazgo de `/partitura` no era un caso aislado sino la forma visible de un defecto repetido: donde el único canal era `aria-live`, la app quedaba muda para quien no usa lector de pantalla —los cinco participantes del test—, y donde convivían TTS y región live sin coordinar, se escuchaba todo dos veces. Los dos síntomas tienen la misma causa y la misma corrección.
+
+La abstracción se justifica por cantidad de usos: cinco pantallas repitiendo el estado de anuncio, la resolución diferida de `isTtsSupported()` y el cálculo de `liveMode` es peor que un hook de treinta líneas. `PedalScreen`, que tenía el patrón inline, se reescribió sobre las piezas nuevas sin cambiar su comportamiento.
+
+**Dos detalles nuevos:**
+
+1. **El BPM se narra al soltar, no en cada paso.** Los botones +/− auto-repiten cada 150 ms; narrar cada incremento produciría veinte anuncios para bajar veinte pulsos, exactamente lo que reportó una participante. El valor se lleva en un ref porque el intervalo de auto-repeat no ve el estado actualizado de React.
+2. **`announce` acepta una velocidad explícita.** Solo la necesita `/ajustes`: la muestra hablada al elegir velocidad tiene que sonar a la velocidad recién elegida, que en ese render todavía no está en `settings`.
+
+**Caso pendiente que se cierra:** la duplicación de `TtsSpeedSetting` anotada en la entrada del 2026-07-28. `SettingCarousel` recibe ahora una prop `liveMode` (default `polite`, que preserva su comportamiento para cualquier uso que no narre) y las cinco preferencias la ponen en `off`, porque el texto viaja por la región única de la pantalla. La prop que entonces se evitó agregar se justifica cuando los cinco usos la necesitan.
 
 ---
 

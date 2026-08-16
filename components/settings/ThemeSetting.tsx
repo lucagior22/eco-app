@@ -2,6 +2,7 @@
 
 import SettingCarousel from '@/components/settings/SettingCarousel'
 import { useSettings } from '@/contexts/SettingsContext'
+import type { AnnounceFn } from '@/hooks/useAnnouncer'
 import type { EcoSettings } from '@/lib/settings'
 
 const THEME_ORDER: EcoSettings['theme'][] = ['light', 'dark', 'hc-light', 'hc-dark']
@@ -13,16 +14,22 @@ const THEME_LABELS: Record<EcoSettings['theme'], string> = {
   'hc-dark': 'Alto contraste oscuro',
 }
 
-export function ThemeSetting() {
+export function ThemeSetting({ announce }: { announce: AnnounceFn }) {
   const { settings, setTheme } = useSettings()
   const currentIndex = THEME_ORDER.indexOf(settings.theme)
+
+  function handleChange(index: number) {
+    setTheme(THEME_ORDER[index])
+    announce(`Color ${THEME_LABELS[THEME_ORDER[index]].toLowerCase()}`)
+  }
 
   return (
     <SettingCarousel
       label="Color"
       options={THEME_ORDER.map((t) => THEME_LABELS[t])}
       currentIndex={currentIndex}
-      onChange={(index) => setTheme(THEME_ORDER[index])}
+      onChange={handleChange}
+      liveMode="off"
     />
   )
 }

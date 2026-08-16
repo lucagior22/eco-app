@@ -114,4 +114,4 @@ Checklist de validaciones requeridas por el enunciado del TFI. Cada sección deb
 
 No es una de las 6 validaciones requeridas por el enunciado, pero se realizó y está volcado en `INFORME.md` §1.4: test de indagación con moderador y *think aloud*, 5 participantes, 7 tareas, 35 ejecuciones.
 
-**Estado:** ✅ Completo — resultados, hallazgos y correcciones derivadas en INFORME.md sección 1.4. Las correcciones están pendientes de implementación; las decisiones asociadas figuran como entradas `Pendiente` en `DECISIONS.md` y como anotaciones `Pendiente` en `SPECIFICATION.md`.
+**Estado:** ✅ Completo — resultados, hallazgos y correcciones derivadas en INFORME.md sección 1.4. Las correcciones del narrador (desbloqueo por gesto, narración de `/partitura`) y el anuncio de BPM al soltar están implementadas desde el 2026-08-16; el resto sigue pendiente, con las decisiones asociadas como entradas `Pendiente` en `DECISIONS.md` y anotaciones `Pendiente` en `SPECIFICATION.md`.

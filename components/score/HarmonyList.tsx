@@ -1,49 +1,26 @@
 'use client'
 
-// Accesibilidad: el estado de carga usa aria-live="assertive" para anunciarse
-// inmediatamente. La lista de acordes es un <ul> semántico con aria-label.
-// El botón "Narrar acordes" lee todos los acordes en español via TTS —
-// nunca dice "Sim" porque chordToSpanish convierte antes de hablar.
+// Accesibilidad: la lista de acordes es un <ul> semántico con aria-label. El botón
+// "Narrar acordes" delega en el canal único de PartituraContent (onNarrate) — nunca dice
+// "Sim" porque chordToSpanish convierte antes de hablar.
 //
-// Canal único (mismo criterio que /afinador y /pedal): cada texto se anuncia
-// por un solo camino. La región sr-only de abajo es la única live region de la
-// pantalla — el bloque visual de error no lleva role="alert", y el nombre en
-// español de cada acorde vive en un único nodo, visible y accesible a la vez.
-// Duplicar cualquiera de los dos hace que el lector de pantalla lea todo dos veces.
+// Este componente no anuncia nada por su cuenta: no tiene live region propia y el bloque
+// visual de error no lleva role="alert". El nombre en español de cada acorde vive en un
+// único nodo, visible y accesible a la vez. Duplicar cualquiera de los dos hace que el
+// lector de pantalla lea todo dos veces.
 
-import { useSettings } from '@/contexts/SettingsContext'
 import { chordToSpanish } from '@/lib/chords'
-import { speak, cancelSpeech } from '@/lib/tts'
 
 interface HarmonyListProps {
   chords: string[]
   status: 'idle' | 'loading' | 'done' | 'error'
   errorMessage: string | null
+  onNarrate: () => void
 }
 
-export default function HarmonyList({ chords, status, errorMessage }: HarmonyListProps) {
-  const { settings } = useSettings()
-
-  function handleNarrate() {
-    cancelSpeech()
-    const text = chords.map(chordToSpanish).join('. ')
-    speak(text, settings.ttsSpeed)
-  }
-
+export default function HarmonyList({ chords, status, errorMessage, onNarrate }: HarmonyListProps) {
   return (
     <>
-      {/* Región de anuncios de carga y error — assertive para respuesta inmediata.
-          Se renderiza SIEMPRE, incluso en estado idle: un lector de pantalla no
-          anuncia una región live que aparece en el DOM al mismo tiempo que su
-          contenido. Tiene que existir vacía desde el primer render para que el
-          cambio a "Analizando partitura" se escuche. */}
-      <div aria-live="assertive" aria-atomic="true" className="sr-only">
-        {status === 'loading' && 'Analizando partitura'}
-        {status === 'error' && (errorMessage ?? 'Error al analizar la partitura')}
-        {status === 'done' && chords.length === 0 && 'No se detectaron acordes'}
-        {status === 'done' && chords.length > 0 && `Se detectaron ${chords.length} acordes`}
-      </div>
-
       {status !== 'idle' && (
         <section aria-label="Resultado del análisis" className="mt-4">
           {status === 'loading' && (
@@ -64,7 +41,7 @@ export default function HarmonyList({ chords, status, errorMessage }: HarmonyLis
             </div>
           )}
 
-          {/* Sin role="alert": la región aria-live de arriba ya anuncia este mismo
+          {/* Sin role="alert": el canal único de PartituraContent ya anuncia este mismo
               texto. Con los dos, el lector de pantalla lo lee dos veces. */}
           {status === 'error' && (
             <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-800">
@@ -86,7 +63,7 @@ export default function HarmonyList({ chords, status, errorMessage }: HarmonyLis
                 </h2>
                 <button
                   type="button"
-                  onClick={handleNarrate}
+                  onClick={onNarrate}
                   aria-label="Narrar todos los acordes detectados"
                   className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white focus:outline-2 focus:outline-[var(--color-accent)] focus:outline-offset-2"
                 >

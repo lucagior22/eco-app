@@ -3,19 +3,21 @@
 // Accesibilidad: el input file está oculto visualmente y activado por un <label>
 // asociado con htmlFor/id — así el botón visible es el nombre accesible del input.
 // El stream de cámara tiene aria-label descriptivo.
-// Los errores de cámara usan role="alert" para anunciarse inmediatamente.
+// El error de cámara viaja por el canal único de PartituraContent (onError), no por un
+// role="alert" propio: así se escucha también sin lector de pantalla.
 // Durante la captura, "Cancelar" cierra la cámara y vuelve al estado inicial.
 
 import { useRef, useState } from 'react'
 
 interface ScoreUploadProps {
   onFile: (file: File) => void
+  onError: (message: string) => void
   isLoading: boolean
 }
 
 type CameraStatus = 'idle' | 'active'
 
-export default function ScoreUpload({ onFile, isLoading }: ScoreUploadProps) {
+export default function ScoreUpload({ onFile, onError, isLoading }: ScoreUploadProps) {
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle')
   const [cameraError, setCameraError] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -44,7 +46,9 @@ export default function ScoreUpload({ onFile, isLoading }: ScoreUploadProps) {
         }
       })
     } catch {
-      setCameraError('No se pudo acceder a la cámara. Verificá los permisos.')
+      const msg = 'No se pudo acceder a la cámara. Verificá los permisos.'
+      setCameraError(msg)
+      onError(msg)
     }
   }
 
@@ -107,11 +111,8 @@ export default function ScoreUpload({ onFile, isLoading }: ScoreUploadProps) {
 
   return (
     <div className="space-y-3">
-      {cameraError && (
-        <p role="alert" className="text-sm text-red-600">
-          {cameraError}
-        </p>
-      )}
+      {/* Sin role="alert": el texto ya viaja por el canal único del padre. */}
+      {cameraError && <p className="text-sm text-red-600">{cameraError}</p>}
 
       <div className="flex flex-col gap-3 sm:flex-row">
         {/* Input file oculto — activado por el label/botón de abajo */}

@@ -311,6 +311,8 @@ El test produjo el siguiente plan de trabajo, ordenado por impacto observado. Lo
 
 La precisión de la detección de perillas queda fuera de este plan: es trabajo de algoritmo y no de interfaz, y se aborda por separado (§2.3).
 
+Al 16 de agosto de 2026 están implementadas las tres correcciones del narrador y del metrónomo que compartían causa: la retención de la locución hasta el primer gesto, la narración de los estados de proceso, el resultado vacío y los errores en `/partitura`, y el anuncio del BPM al soltar el botón en lugar de uno por pulso. La auditoría que siguió mostró que el defecto de `/partitura` se repetía en el metrónomo, en los ajustes y en los mensajes de error de cámara y micrófono, todos anunciados por un solo canal; las cuatro pantallas usan ahora el mismo patrón de narración (ver `DECISIONS.md`, entrada del 2026-08-16). El resto de las correcciones de la tabla sigue pendiente.
+
 ---
 
 # Parte 2 — Desarrollo

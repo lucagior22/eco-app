@@ -6,8 +6,8 @@
 // El botón de flash (si el dispositivo lo soporta) usa aria-pressed para
 // indicar su estado. El resultado de la detección lo anuncia PedalScreen por su
 // canal único (TTS primario + aria-live de fallback), no este componente.
-// El error de cámara sí usa role="alert" acá porque no viaja por ese canal:
-// si la cámara no arranca, `onReady` nunca se dispara y nadie más lo anuncia.
+// El error de cámara también viaja por ese canal: se notifica al padre con `onError`
+// en vez de anunciarse acá, así el usuario lo escucha sin lector de pantalla.
 
 import { useEffect, useRef } from 'react'
 import { useCamera } from '@/hooks/useCamera'
@@ -27,6 +27,7 @@ interface CameraViewProps {
   onCapture: (files: File[]) => void
   onBurstStart?: () => void
   onReady?: (torchSupported: boolean) => void
+  onError?: (message: string) => void
 }
 
 export default function CameraView({
@@ -34,6 +35,7 @@ export default function CameraView({
   onCapture,
   onBurstStart,
   onReady,
+  onError,
 }: CameraViewProps) {
   const { videoRef, isActive, error, torchSupported, torchOn, toggleTorch } = useCamera()
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -45,6 +47,10 @@ export default function CameraView({
       buttonRef.current?.focus()
     }
   }, [isActive]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (error) onError?.(`No se puede acceder a la cámara. ${error}`)
+  }, [error]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function grabFrame(): Promise<File | null> {
     const video = videoRef.current
@@ -81,12 +87,10 @@ export default function CameraView({
     onCapture(files)
   }
 
+  // Sin role="alert": el texto ya viaja por el canal único del padre (onError).
   if (error) {
     return (
-      <div
-        role="alert"
-        className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
-      >
+      <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
         <p className="font-semibold text-[var(--color-text-primary)]">
           No se puede acceder a la cámara
         </p>

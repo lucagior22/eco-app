@@ -11,7 +11,7 @@ del afinador. Refleja el estado actual del código.
 | [`hooks/useMicrophone.ts`](../hooks/useMicrophone.ts) | Acceso a `getUserMedia`, enumeración y selección de micrófonos, manejo de errores de permiso. |
 | [`hooks/useTuner.ts`](../hooks/useTuner.ts) | Loop de análisis (grafo de audio), suavizado, máquina de estados de afinación y narración TTS. |
 | [`lib/pitch.ts`](../lib/pitch.ts) | YIN, gate de RMS, conversión frecuencia→nota, corrección de octava, helpers de cuerdas. |
-| [`lib/tts.ts`](../lib/tts.ts) | Wrapper de Web Speech API (`speak`, `cancelSpeech`). |
+| [`lib/tts.ts`](../lib/tts.ts) | Wrapper de Web Speech API (`speak`, `cancelSpeech`), con retención de la locución hasta el primer gesto del usuario. |
 | [`components/tuner/TunerDisplay.tsx`](../components/tuner/TunerDisplay.tsx) | Nota detectada + selección de cuerda. |
 | [`components/tuner/PitchIndicator.tsx`](../components/tuner/PitchIndicator.tsx) | Visualización de la desviación en cents. |
 
@@ -113,6 +113,10 @@ La narración pasa por un único helper `announce(text)` que usa un **token de g
 > una nota. El token descarta los callbacks de locuciones obsoletas. El colchón de 300 ms
 > tras el `onEnd` absorbe la cola acústica antes de reanudar.
 
+El anuncio de modo espera al stream: mientras el navegador pide el permiso, lo único accionable es
+aceptarlo, así que ese aviso lo hace `AfinadorScreen` y el `"Modo automático"` sale recién cuando el
+micrófono está activo.
+
 Qué se anuncia (con cooldown de 3 s y solo ante cambios): al fijar cuerda, `"Afinando <nota>"`;
 en automático, `"Modo automático"`; y por cambio de estado, `"<nota>. Afinado/Un poco alto/Un poco bajo."`.
 
@@ -128,4 +132,3 @@ en automático, `"Modo automático"`; y por cambio de estado, `"<nota>. Afinado/
 
 - La granularidad fina (cents exactos) no se narra; ver hallazgos en
   [`EVAL-AFINADOR.md`](./EVAL-AFINADOR.md).
-- Posible conflicto entre el TTS propio y la región `aria-live` del display (ídem informe).

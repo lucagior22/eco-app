@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { execFile } from 'child_process'
 import { writeFile, unlink } from 'fs/promises'
+import { tmpdir } from 'os'
 import { join } from 'path'
 import { promisify } from 'util'
 
@@ -46,7 +47,8 @@ export async function POST(req: NextRequest) {
 
   const batch = files.slice(0, MAX_IMAGES)
   const stamp = Date.now()
-  const paths = batch.map((_, i) => join('/tmp', `pedal_${stamp}_${i}.jpg`))
+  // tmpdir() y no '/tmp' fijo: en Windows esa ruta no existe y el write falla con ENOENT.
+  const paths = batch.map((_, i) => join(tmpdir(), `pedal_${stamp}_${i}.jpg`))
 
   await Promise.all(
     batch.map(async (file, i) =>

@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSettings } from '@/contexts/SettingsContext'
+import { useAnnouncer } from '@/hooks/useAnnouncer'
 import { useMicrophone } from '@/hooks/useMicrophone'
 import { useTuner } from '@/hooks/useTuner'
 import type { TuningStatus } from '@/hooks/useTuner'
+import LiveRegion from '@/components/a11y/LiveRegion'
 import TunerDisplay from '@/components/tuner/TunerDisplay'
 import PitchIndicator from '@/components/tuner/PitchIndicator'
-import { isTtsSupported } from '@/lib/tts'
 import { Button } from 'react-aria-components'
 
 function getTintColor(status: TuningStatus, cents: number, listening: boolean): string {
@@ -68,17 +69,22 @@ export default function AfinadorScreen() {
     selectedStringIndex,
   )
 
-  // Canal único: cuando el narrador de la app vocaliza, la región aria-live queda en off
-  // para no duplicar la voz. Si el narrador está silenciado o el navegador no soporta TTS,
-  // pasa a polite y el lector de pantalla se vuelve el canal de fallback.
-  const liveMode = ttsEnabled && isTtsSupported() ? 'off' : 'polite'
+  // Canal único: el texto del afinador lo produce useTuner y esta región es su fallback, que
+  // queda en off mientras el narrador vocalice. Los estados previos al stream —pedido de permiso
+  // y error— no pasan por useTuner, así que se anuncian acá para escucharse sin lector.
+  const { announce, announcement: screenAnnouncement, liveMode } = useAnnouncer(ttsEnabled)
+
+  useEffect(() => {
+    if (error) announce(error, 'assertive')
+    else if (!stream) announce('Aceptá el permiso de micrófono para empezar a afinar', 'assertive')
+  }, [error, stream, announce])
 
   if (error) {
     return (
       <div className="flex flex-col items-center gap-4 px-4 py-16 text-center">
-        <p role="alert" aria-live="assertive" className="text-[var(--color-error)]">
-          {error}
-        </p>
+        <LiveRegion announcement={screenAnnouncement} liveMode={liveMode} />
+        {/* Sin role="alert": el texto ya viaja por el canal único de arriba. */}
+        <p className="text-[var(--color-error)]">{error}</p>
         <p className="text-sm text-[var(--color-text-secondary)]">
           Activá el permiso de micrófono en la configuración del navegador.
         </p>
@@ -96,6 +102,7 @@ export default function AfinadorScreen() {
         aria-busy="true"
         aria-label="Solicitando permiso de micrófono"
       >
+        <LiveRegion announcement={screenAnnouncement} liveMode={liveMode} />
         <p className="text-[var(--color-text-secondary)]">Solicitando permiso de micrófono...</p>
       </div>
     )
@@ -106,9 +113,7 @@ export default function AfinadorScreen() {
       className="flex flex-1 flex-col items-center gap-10 px-4 py-8 transition-[background-color] duration-300"
       style={{ backgroundColor: getTintColor(status, detectedNote?.cents ?? 0, isListening) }}
     >
-      <p className="sr-only" role="status" aria-live={liveMode} aria-atomic="true">
-        {announcement}
-      </p>
+      <LiveRegion announcement={announcement} liveMode={liveMode} />
 
       <div className="w-full max-w-sm rounded-3xl bg-[var(--color-surface)] p-6">
         <TunerDisplay

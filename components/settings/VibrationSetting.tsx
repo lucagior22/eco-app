@@ -2,18 +2,21 @@
 
 // Accesibilidad: control booleano implementado con Switch de react-aria
 // (role="switch" + aria-checked), preferible a un carrusel para un on/off.
-// El nombre accesible viene de aria-label="Vibración"; el estado se anuncia
-// solo por el rol del switch. El estilo del track/thumb se deriva de los render
-// props (isSelected/isFocusVisible), sin depender de variantes de Tailwind.
+// El nombre accesible viene de aria-label="Vibración"; el rol del switch expone el estado al
+// lector de pantalla y el cambio se narra además por el canal único, para quien no usa lector.
+// El estilo del track/thumb se deriva de los render props (isSelected/isFocusVisible), sin
+// depender de variantes de Tailwind.
 
 import { Switch } from 'react-aria-components'
 import { useSettings } from '@/contexts/SettingsContext'
+import type { AnnounceFn } from '@/hooks/useAnnouncer'
 
-export function VibrationSetting() {
+export function VibrationSetting({ announce }: { announce: AnnounceFn }) {
   const { settings, setVibration } = useSettings()
 
   function handleChange(selected: boolean) {
     setVibration(selected)
+    announce(selected ? 'Vibración activada' : 'Vibración desactivada')
     // Confirmación háptica al activar: el usuario siente que la vibración funciona.
     if (selected) navigator.vibrate?.(80)
   }

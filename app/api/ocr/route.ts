@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { execFile } from 'child_process'
 import { writeFile, unlink, readFile } from 'fs/promises'
+import { tmpdir } from 'os'
 import { join } from 'path'
 import { promisify } from 'util'
 import { CHORD_QUALITIES } from '@/lib/chords'
@@ -152,10 +153,12 @@ export async function POST(req: NextRequest) {
   // La extensión de la imagen es irrelevante: Tesseract detecta el formato por
   // la cabecera del archivo, no por el nombre. Se usa una fija en vez de la del
   // archivo subido para no meter texto controlado por el usuario en una ruta.
-  const sourcePath = join('/tmp', `${baseName}.${isPdf ? 'pdf' : 'img'}`)
-  const tsvPath = join('/tmp', `${baseName}.tsv`)
+  // tmpdir() y no '/tmp' fijo: en Windows esa ruta no existe y el write falla con ENOENT.
+  const tmp = tmpdir()
+  const sourcePath = join(tmp, `${baseName}.${isPdf ? 'pdf' : 'img'}`)
+  const tsvPath = join(tmp, `${baseName}.tsv`)
   // Tesseract agrega la extensión según el formato de salida pedido.
-  const tsvBase = join('/tmp', baseName)
+  const tsvBase = join(tmp, baseName)
   const cleanup = [sourcePath, tsvPath]
 
   await writeFile(sourcePath, Buffer.from(await imageFile.arrayBuffer()))
@@ -163,7 +166,7 @@ export async function POST(req: NextRequest) {
   try {
     let ocrInput = sourcePath
     if (isPdf) {
-      ocrInput = await pdfToImage(sourcePath, join('/tmp', `${baseName}_page`))
+      ocrInput = await pdfToImage(sourcePath, join(tmp, `${baseName}_page`))
       cleanup.push(ocrInput)
     }
 

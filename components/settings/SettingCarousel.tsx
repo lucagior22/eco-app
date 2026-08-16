@@ -2,17 +2,28 @@
 
 // Accesibilidad: rol "group" con aria-labelledby apuntando al label.
 // Botones prev/next tienen aria-label dinámico basado en la prop label.
-// El valor actual usa aria-live="polite" para anunciar cambios al navegar.
+// El valor actual usa aria-live para anunciar cambios al navegar. `liveMode` permite apagarla
+// cuando el padre ya narra el cambio por el TTS de la app (canal único): con las dos, el lector
+// de pantalla lee el valor dos veces.
 // Teclas ← → cambian el valor cuando el foco está en el grupo (§6.5).
+
+import type { LiveMode } from '@/hooks/useAnnouncer'
 
 interface SettingCarouselProps {
   label: string
   options: readonly string[]
   currentIndex: number
   onChange: (index: number) => void
+  liveMode?: LiveMode
 }
 
-export default function SettingCarousel({ label, options, currentIndex, onChange }: SettingCarouselProps) {
+export default function SettingCarousel({
+  label,
+  options,
+  currentIndex,
+  onChange,
+  liveMode = 'polite',
+}: SettingCarouselProps) {
   const labelId = `carousel-label-${label.toLowerCase().replace(/\s+/g, '-')}`
   const count = options.length
 
@@ -49,7 +60,7 @@ export default function SettingCarousel({ label, options, currentIndex, onChange
           ‹
         </button>
         <div
-          aria-live="polite"
+          aria-live={liveMode}
           aria-atomic="true"
           className="flex-1 text-center text-base font-semibold text-[var(--color-text-primary)]"
         >

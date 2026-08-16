@@ -106,12 +106,17 @@ export function useTuner(
     nullCountRef.current = 0
     committedStatusRef.current = 'silent'
 
+    // Sin stream todavía no hay afinador: anunciar el modo mientras el navegador pide el permiso
+    // pisaría el aviso del permiso, que es lo único accionable en ese momento. Con `stream` en las
+    // dependencias, el modo se anuncia recién cuando el micrófono está activo.
+    if (!stream) return
+
     const text = targetStringIndex === null
       ? 'Modo automático'
       : `Afinando ${NOTE_NAMES_ES[GUITAR_STRINGS[targetStringIndex].label] ?? GUITAR_STRINGS[targetStringIndex].label}`
     setAnnouncement(text)
     if (ttsEnabledRef.current) announce(text)
-  }, [targetStringIndex, announce])
+  }, [targetStringIndex, stream, announce])
 
   useEffect(() => {
     isListeningRef.current = isListening

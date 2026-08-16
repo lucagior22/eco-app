@@ -264,6 +264,8 @@ Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
 - Cada acorde es un `<li>` legible por screen reader
 - Botones de "Subir" y "Tomar foto" tienen labels descriptivos
 
+> **Implementado:** los estados de proceso, el resultado (incluido el vacío) y los errores se narran por el TTS de la app; la región `aria-live` de la pantalla es su fallback y queda en `off` mientras el navegador soporte Web Speech. La región vive en `PartituraContent`, no en `HarmonyList`, porque el texto tiene que salir de una fuente única. El error de cámara de `ScoreUpload` viaja por el mismo canal en vez de por un `role="alert"` propio. Ver DECISIONS.md, entrada del 2026-08-16.
+
 ---
 
 ### 6.3 Metrónomo (`/partitura/metronomo`)
@@ -290,7 +292,10 @@ Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
 - Botón Play: `aria-pressed="true/false"`, label "Iniciar metrónomo" / "Detener metrónomo"
 - Botones +/−: `aria-label="Incrementar BPM"` / `aria-label="Decrementar BPM"`
 
-> **Pendiente:** el valor visible del BPM se sigue actualizando en tiempo real, pero la región `aria-live` se actualiza con retardo (~500 ms sin cambios) y anuncia solo el valor final. Con el anuncio directo, bajar de 120 a 100 encadena veinte locuciones: en el test de usabilidad la participante con discapacidad visual lo describió como "veinte anuncios para bajar veinte pulsos" y no podía pensar mientras tanto. Un ajuste, un anuncio, sin importar su magnitud. Se agrega además un texto de ayuda referenciado por `aria-describedby` en los botones +/− que comunique que la pulsación sostenida acelera el cambio: hoy la función existe pero no se descubre. Ver INFORME.md §1.4.
+> **Implementado:** el valor visible del BPM se sigue actualizando en tiempo real, pero el anuncio sale **al soltar** el botón y dice solo el valor final — un ajuste, un anuncio, sin importar su magnitud. Se resolvió por el gesto y no por un temporizador de inactividad: el momento en que el usuario suelta es la señal exacta de que terminó de ajustar, y no agrega latencia. El display grande de BPM dejó de ser región `aria-live`: el valor viaja por el canal único (TTS + región de fallback), como el compás y el inicio/detención. Queda pendiente el texto de ayuda con `aria-describedby` en los botones +/− que comunique que la pulsación sostenida acelera el cambio.
+> Con el anuncio directo, bajar de 120 a 100 encadenaba veinte locuciones: en el test de usabilidad la participante con discapacidad visual lo describió como "veinte anuncios para bajar veinte pulsos" y no podía pensar mientras tanto. Ver INFORME.md §1.4.
+>
+> **Pendiente:** el texto de ayuda con `aria-describedby` en los botones +/− que comunique que la pulsación sostenida acelera el cambio: hoy la función existe pero no se descubre.
 
 ---
 
@@ -362,6 +367,8 @@ interface EcoSettings {
 - Botones `<` y `>`: `aria-label="Tema anterior"` / `aria-label="Siguiente tema"`
 - Valor actual: `aria-live="polite"` para anunciar el cambio
 - Teclado: flechas izquierda/derecha también cambian el valor
+
+> **Implementado:** cada preferencia narra su nuevo valor por el TTS de la app y la región del carrusel queda en `off` (prop `liveMode`), para que el lector de pantalla no lea el valor dos veces. La pantalla tiene una única región `aria-live` compartida por las cinco preferencias, que actúa de fallback si el navegador no soporta Web Speech. La velocidad del narrador se narra a la velocidad recién elegida. Ver DECISIONS.md, entrada del 2026-08-16.
 
 ---
 
