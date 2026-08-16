@@ -137,10 +137,14 @@ Ignora `.next`, `out`, `build`, `node_modules`, `public/sw.js`, `next-env.d.ts`.
 
 ---
 
-## Pendientes para las próximas fases
+## Pendientes de la fase de infraestructura — cerrados
 
-- Generar los íconos PWA `public/icons/icon-192.png` y `icon-512.png` (el manifest ya los referencia).
-- Implementar la lógica de cada pantalla (afinador, partitura, metrónomo, pedal, ajustes) y los stubs de `lib/` y `hooks/`.
-- Implementar el endpoint real `/api/ocr` (child_process → oemer, según `SPECIFICATION.md §6.2`).
-- Limpiar los `void param` de los stubs al activar `argsIgnorePattern: "^_"` en ESLint.
-- Validar el `Dockerfile` con un build real.
+Los cinco pendientes que listaba esta sección están resueltos. Se conservan con su resolución porque documentan el paso de la infraestructura base al sistema funcionando:
+
+- **Íconos PWA:** resueltos como SVG (`public/icons/icon-192.svg` y `icon-512.svg`), no como PNG. `app/manifest.ts` los declara con `type: "image/svg+xml"`. La spec §7 todavía muestra PNG en su ejemplo de manifest.
+- **Lógica de las pantallas:** las cinco están implementadas, junto con los módulos de `lib/` y `hooks/`. Queda un único stub sin uso, `components/tuner/TunerEngine.tsx`: la lógica de audio terminó viviendo en `hooks/useTuner.ts`.
+- **Endpoint `/api/ocr`:** implementado, pero con Tesseract y no con oemer. oemer no reconoce cifrado de acordes, que es justamente lo que `/partitura` necesita leer. Ver la entrada del 2026-07-28 en `DECISIONS.md` y `claude-docs/OCR-PARTITURA.md`.
+- **`void param` de los stubs:** ya no existen. Los `void` que quedan (`hooks/useTuner.ts`, `hooks/useMetronome.ts`) son deliberados: descartan promesas de `AudioContext.resume()` y `close()`.
+- **Dockerfile:** validado con builds reales. Es el que Railway construye y corre en producción (entrada del 2026-06-30 en `DECISIONS.md`).
+
+La tabla de gates de arriba refleja el estado de esta fase inicial: `POST /api/ocr` ya no responde 501, y hoy hay más rutas que las 12 páginas de entonces.

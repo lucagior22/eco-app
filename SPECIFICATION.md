@@ -3,6 +3,10 @@
 > Fuente de verdad para el agente. Ante cualquier ambigüedad, este archivo tiene prioridad.
 >
 > **Diseño (Figma):** https://www.figma.com/design/AebURRhSh0VGRnlkDrApKA/Prototipo---TP-final
+>
+> **Convención de anotaciones:** `> **Implementado:**` describe lo que el código ya hace y difiere de la spec.
+> `> **Pendiente:**` describe un cambio ya decidido pero todavía no escrito. Al implementarlo, se cambia la
+> etiqueta a `Implementado` con la fecha.
 
 ---
 
@@ -174,6 +178,8 @@ Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
 - Mobile: ruta separada `/partitura/metronomo`, botón back con flecha ←
 - Desktop: panel derecho inline dentro de `/partitura` (split 50/50)
 
+> **Pendiente:** el metrónomo deja de depender de Partitura y se suma a la barra de navegación como quinto ítem, entre Partitura y Pedal (ver §6.3). Queda por verificar que los cinco ítems entren sin recortar el label en 375 px con la fuente en tamaño muy grande: el texto es el nombre accesible de cada ítem, así que el ajuste tiene que salir del ícono y el padding, nunca de truncar la palabra.
+
 ---
 
 ## 6. Pantallas
@@ -203,6 +209,8 @@ Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
    - Si centavos < -10: "Re. Un poco bajo."
 
    > **Implementado:** umbral con histéresis: entra en "afinado" con ≤10 cents, sale con >20 cents. Evita flip-flop en tocadas consecutivas cerca del umbral. La detección se pausa mientras el TTS habla para evitar que el micrófono capte la voz sintetizada.
+
+   > **Pendiente:** el umbral pasa a ≤5 cents para entrar y >10 para salir. En el test de usabilidad los dos participantes con oído entrenado escucharon la cuerda todavía baja cuando la app ya anunciaba "afinado": con la histéresis actual el estado se sostiene hasta 20 cents, que es audible. La magnitud se sigue comunicando con palabras y no con el número de cents —un usuario no músico no sabe qué es un cent—, pero la escala verbal se afina cerca del punto justo para que el usuario perciba que se está acercando: se agrega un escalón "casi afinada" entre 5 y 12 cents, que es el que evita pasarse de largo. Ver INFORME.md §1.4.
 
 7. En desktop: mostrar selector de micrófono (dropdown con `enumerateDevices`)
 
@@ -260,6 +268,10 @@ Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
 
 ### 6.3 Metrónomo (`/partitura/metronomo`)
 
+> **Pendiente:** el metrónomo pasa a ser una pantalla de primer nivel en `/metronomo`, con ícono propio en la barra de navegación y redirect permanente desde `/partitura/metronomo`. En el test de usabilidad los cinco participantes lo buscaron en la barra inferior antes que dentro de Partitura, y uno no lo encontró. Al dejar de ser una pantalla anidada, desaparecen el enlace "Ir al metrónomo" de `/partitura` y el botón "Volver" de la pantalla del metrónomo. Ver INFORME.md §1.4.
+
+> **Pendiente:** se agrega el control de vibración dentro de la pantalla del metrónomo, además del que ya está en `/ajustes`. Es el mismo estado de `SettingsContext` expuesto en dos lugares: los cinco participantes lo buscaron acá y una participante abandonó la tarea sin encontrarlo.
+
 **Propósito:** metrónomo con BPM ajustable, audio y háptico.
 
 **Comportamiento:**
@@ -277,6 +289,8 @@ Cuatro ítems siempre visibles: Partitura, Pedal, Afinador, Ajustes.
 - Display BPM: `aria-live="polite"` solo cuando cambia por +/−
 - Botón Play: `aria-pressed="true/false"`, label "Iniciar metrónomo" / "Detener metrónomo"
 - Botones +/−: `aria-label="Incrementar BPM"` / `aria-label="Decrementar BPM"`
+
+> **Pendiente:** el valor visible del BPM se sigue actualizando en tiempo real, pero la región `aria-live` se actualiza con retardo (~500 ms sin cambios) y anuncia solo el valor final. Con el anuncio directo, bajar de 120 a 100 encadena veinte locuciones: en el test de usabilidad la participante con discapacidad visual lo describió como "veinte anuncios para bajar veinte pulsos" y no podía pensar mientras tanto. Un ajuste, un anuncio, sin importar su magnitud. Se agrega además un texto de ayuda referenciado por `aria-describedby` en los botones +/− que comunique que la pulsación sostenida acelera el cambio: hoy la función existe pero no se descubre. Ver INFORME.md §1.4.
 
 ---
 
@@ -369,6 +383,8 @@ interface EcoSettings {
   ]
 }
 ```
+
+> **Implementado:** los íconos son SVG, no PNG — `/icons/icon-192.svg` y `/icons/icon-512.svg`, declarados con `type: "image/svg+xml"`. El resto del manifest coincide con este ejemplo.
 
 Serwist: precachear páginas y assets estáticos. Audio y cámara no se cachean.
 

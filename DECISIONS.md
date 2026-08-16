@@ -3,6 +3,39 @@
 Registro de decisiones de arquitectura que no quedan evidentes en el código.
 Formato: fecha + decisión + razones.
 
+Una entrada encabezada `Pendiente` es una decisión ya tomada pero todavía no implementada. Al escribirla en
+el código se reemplaza `Pendiente` por la fecha y se elimina la línea de estado.
+
+---
+
+## Pendiente — Desbloqueo del TTS por gesto del usuario
+
+**Estado:** decidido, no implementado. Deriva del test de usabilidad (INFORME.md §1.4).
+
+**Decisión:** `lib/tts.ts` deja de asumir que `speechSynthesis.speak()` se ejecuta siempre. Mientras no haya habido una interacción del usuario en la página, `speak()` retiene el texto como locución pendiente en lugar de emitirlo; un listener global de `pointerdown`/`keydown`, que se registra una sola vez y se remueve al dispararse, marca el estado como desbloqueado y emite lo retenido. Solo se conserva la última locución pendiente: si hubo varios anuncios antes del gesto, el único vigente es el más reciente.
+
+**Razones:**
+Los navegadores móviles descartan la síntesis de voz que no proviene de un gesto del usuario. El primer anuncio del afinador sale del efecto de montaje de `useTuner`, es decir, antes de cualquier interacción, así que se perdía siempre — y `speak()` no tenía forma de detectarlo, porque la API no reporta el descarte.
+
+El efecto medido en el test es desproporcionado respecto de la causa: tres de los cinco participantes concluyeron que el narrador estaba roto. Francisco lo anotó como falla ("no anda el narrador") y Thiago y Mónica lo resolvieron por casualidad, tocando la pantalla. Para una app cuyo canal principal de salida es la voz, arrancar en silencio equivale a arrancar rota.
+
+Retener y reemitir, en lugar de simplemente reintentar, preserva el contenido del anuncio: lo que el usuario escucha al primer toque es el estado real de la pantalla en ese momento, no un mensaje genérico de bienvenida.
+
+---
+
+## Pendiente — El metrónomo pasa a pantalla de primer nivel
+
+**Estado:** decidido, no implementado. Deriva del test de usabilidad (INFORME.md §1.4).
+
+**Decisión:** el metrónomo se mueve de `/partitura/metronomo` a `/metronomo`, con ícono propio en la barra de navegación y redirect permanente desde la ruta anterior. Se eliminan el enlace "Ir al metrónomo" dentro de `/partitura` y el botón "Volver a partitura" de la pantalla del metrónomo. El control de vibración se expone también dentro del metrónomo, además de en `/ajustes`.
+
+**Razones:**
+La jerarquía original tenía una lógica de dominio: se marca el tempo de la partitura que se está leyendo. Pero ninguno de los cinco participantes del test la reconstruyó. Los cinco buscaron el metrónomo en la barra inferior; Thiago recorrió además Ajustes antes de encontrarlo y Fernanda no lo encontró nunca. Mónica lo dijo con precisión: "para mí es una herramienta aparte". Un metrónomo se usa para practicar escalas o mantener el pulso, no solo para leer una partitura, y el modelo mental de los usuarios refleja ese uso.
+
+El mismo criterio explica la duplicación del control de vibración. Es la misma preferencia de `SettingsContext` —no hay estado duplicado ni que sincronizar— expuesta donde el usuario la busca: los cinco la buscaron dentro del metrónomo, y una de ellas abandonó esa parte de la tarea al no encontrarla. Que un ajuste sea global no obliga a que exista en un solo lugar.
+
+Como efecto secundario se corrige un `aria-current` incorrecto: al evaluarse con `pathname.startsWith('/partitura/')`, la navegación marcaba "Partitura" como página actual mientras el usuario estaba en el metrónomo. Con las rutas al mismo nivel, el problema desaparece sin lógica adicional.
+
 ---
 
 ## 2026-06-01 — Next.js 15 (no 16)
@@ -284,6 +317,8 @@ El usuario reportó que, en un lote de fotos en vivo, varias daban 0-1 perillas 
 ---
 
 ## 2026-06-30 — Afinador: canal único de audio (TTS primario + aria-live fallback)
+
+> **Corregida en parte el mismo día (commit `77b7f49`).** El anuncio no dice el número de cents: dice la magnitud con palabras ("Mi. Medianamente alto."), con tres escalones según la desviación. La decisión de fondo —que la magnitud tiene que ser audible— se mantiene; lo que cambió es la unidad. El número de cents no le sirve a quien no sabe qué es un cent, que es la mayoría de los usuarios. El ejemplo "Mi. 12 centavos alto." de más abajo describe una implementación que no llegó a quedar en el código.
 
 **Decisión:** El feedback al usuario que no ve viaja por un solo canal coherente. `useTuner` es la fuente única del texto a anunciar (`announcement`), gobernada por la misma lógica de cambio-significativo + cooldown de 3 s que el TTS. El TTS propio de la app es el canal primario; la región `aria-live` (única, `role="status"` y `sr-only` en `AfinadorScreen`) actúa como fallback y queda en `off` cuando el narrador está activo y el navegador soporta Web Speech, o en `polite` en caso contrario. El bloque visual de `TunerDisplay` deja de ser `aria-live`. El anuncio incluye la magnitud de la desviación ("Mi. 12 centavos alto.").
 

@@ -102,7 +102,11 @@ Evita la combinación rojo/verde (problemática para daltónicos del tipo deuter
 
 ---
 
-## Pendiente
+## Pendientes resueltos
 
-- Wiring de `hc-dark` en `SettingsContext` y la UI de Ajustes (actualmente solo se activa vía `data-theme="hc-dark"` en el HTML).
-- Fuente Atkinson Hyperlegible: el Figma la especifica; no implementada todavía (ver DECISIONS.md si se decide adoptar).
+Los dos pendientes que listaba esta sección ya están implementados:
+
+- **Wiring de `hc-dark`** (commit `4ff030c`, 2026-06-05): los cuatro temas se seleccionan desde `/ajustes`; `ThemeSetting` los expone en el orden Claro, Oscuro, Alto contraste claro, Alto contraste oscuro, y `SettingsContext` los persiste en `localStorage`.
+- **Atkinson Hyperlegible** (commit `c5942bb`, 2026-06-05): se adoptó, y además es la familia por defecto (`DEFAULT_SETTINGS.fontFamily = 'hyperlegible'`). `/ajustes` permite elegir entre Hyperlegible, Inter, Lexend y la fuente del sistema.
+
+Pendiente abierto, detectado en el test de usabilidad (INFORME.md §1.4): con el tamaño de fuente en "muy grande" y 375 px de ancho, la fila de cuerdas del afinador desborda. No es un problema de color sino de layout, pero afecta a la misma población que estos temas están pensados para servir.

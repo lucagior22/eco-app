@@ -23,7 +23,7 @@ El parámetro `torchSupported` refleja una extensión posterior del mismo criter
 
 **Acordes en español para TTS.** Los nombres de acordes en notación estándar son ininteligibles para un sintetizador de voz: "Bm" se leería "bi eme", "C#maj7" no significa nada hablado. Se implementó `chordToSpanish()` que convierte cualquier acorde antes de pasarlo al narrador: "Am" → "La menor", "C#maj7" → "Do sostenido mayor séptima". Un caso especial es "Bm": sin la conversión el TTS diría "Sim", que es un homófono de "sí mismo" y genera confusión.
 
-**Color nunca como único diferenciador.** El ítem activo en la navegación tiene `aria-current="page"` y un subrayado visible, no solo un cambio de color. En el afinador, el estado de afinación no se comunica con el verde de la aguja sino con texto explícito ("Afinado", "Un poco alto", "Un poco bajo") más la magnitud en centavos. En el metrónomo, el botón de reproducción cambia su etiqueta ("Iniciar metrónomo" / "Detener metrónomo") y su `aria-pressed`, no solo su color. Esto cubre tanto a usuarios con daltonismo como a quienes usan lectores de pantalla.
+**Color nunca como único diferenciador.** El ítem activo en la navegación tiene `aria-current="page"` y un subrayado visible, no solo un cambio de color. En el afinador, el estado de afinación no se comunica con el verde de la aguja sino con texto explícito ("Afinado", "Un poco alto", "Un poco bajo") más una escala verbal de magnitud ("un poco", "medianamente", "muy"). En el metrónomo, el botón de reproducción cambia su etiqueta ("Iniciar metrónomo" / "Detener metrónomo") y su `aria-pressed`, no solo su color. Esto cubre tanto a usuarios con daltonismo como a quienes usan lectores de pantalla.
 
 **Narrador como primer foco en el afinador.** La pantalla `/afinador` tiene seis botones de selección de cuerda que aparecen visualmente primero, pero en términos de orden de tabulación eso crea un problema: un usuario ciego llega a la pantalla y no puede silenciar el narrador antes de que empiece a hablar, porque el foco cae primero en las cuerdas. La solución fue reordenar el DOM para que los botones de control (Narrador y Pausar) queden antes del display del afinador, sin modificar el layout visual. Así el primer Tab del usuario llega al botón Narrador, que puede activar o desactivar antes de que el audio empiece.
 
@@ -216,6 +216,103 @@ En iPhone SE (375px de ancho) con la fuente configurada en tamaño muy grande de
 
 ---
 
+## 1.4 Test de usabilidad con usuarios
+
+Las validaciones de la sección anterior verifican que el código cumple los estándares. Esta sección verifica algo distinto y no deducible de lo anterior: si una persona puede efectivamente usar la app. Los resultados no coinciden, y esa discrepancia es el hallazgo más valioso del trabajo.
+
+### Metodología
+
+Se realizó un test de usabilidad de tipo indagación sobre el sistema en desarrollo, con moderador y protocolo de pensamiento en voz alta (*think aloud*). Participaron cinco usuarios objetivo en sesiones individuales, cada uno resolviendo las mismas siete tareas sobre la app desplegada. Las sesiones se llevaron a cabo durante la segunda y tercera semana de julio de 2026.
+
+La muestra se compuso cruzando dos ejes independientes: la experiencia musical y la alfabetización tecnológica. Esa separación resultó determinante para interpretar los resultados, porque cada eje explica fallas de naturaleza distinta.
+
+| Participante | Perfil                                                       | Experiencia musical                        | Experiencia tecnológica              |
+| ------------ | ------------------------------------------------------------ | ------------------------------------------- | ------------------------------------- |
+| Francisco    | Estudiante, 22 años                                          | Alta — usa a diario herramientas del estilo de Eco | Alta                          |
+| Thiago       | Estudiante avanzado de negocios, 22 años                     | Media — tomó clases en la infancia        | Alta, con experiencia en el sector    |
+| Mónica       | Profesora de música, 33 años, con discapacidad visual moderada | Alta                                      | Alta, usuaria de herramientas de accesibilidad |
+| Dolores      | Estudiante, 25 años                                          | Nula                                       | Media — usuaria cotidiana, no experta |
+| Fernanda     | Arquitecta, 52 años                                          | Nula                                       | Baja                                  |
+
+Mónica es la única participante con discapacidad visual, es decir, la única que representa al usuario principal del sistema. El resto cubre el espectro de personas que acompañan o comparten el uso de una herramienta así.
+
+### Tareas
+
+| N.º | Consigna                                                                                          | Dimensión evaluada |
+| --- | ------------------------------------------------------------------------------------------------- | ------------------ |
+| 1   | Primera apertura de Eco: ingresar y afinar la 6.ª cuerda de la guitarra (bajada ~40 cents antes)   | Contenido          |
+| 2   | Afinar la 4.ª cuerda de espaldas a la pantalla, guiándose solo por lo que se escucha              | Accesibilidad      |
+| 3   | Fotografiar una *lead sheet* con cifrado y obtener la lista de acordes                            | Funcionalidad      |
+| 4   | Repetir con una imagen sin cifrado alfabético, donde la app devuelve lista vacía                  | Feedback           |
+| 5   | Poner el metrónomo a 100 BPM, activar la vibración y hacerlo sonar                                 | Funcionalidad      |
+| 6   | Averiguar en qué posición están las perillas de un pedal                                           | Accesibilidad      |
+| 7   | Configurar alto contraste, narrador rápido y letra muy grande, y volver a usar el afinador        | Interfaz           |
+
+La tarea 2 es la prueba central del sistema: obliga a operar la app sin mirar la pantalla, que es la condición permanente del usuario objetivo.
+
+### Resultados
+
+| Tarea        | Francisco | Thiago  | Mónica  | Dolores | Fernanda | Logradas |
+| ------------ | --------- | ------- | ------- | ------- | -------- | -------- |
+| Tarea 1      | L 1:30    | L 2:10  | L 2:10  | L\* 3:40 | L\* 3:20 | 5 de 5   |
+| Tarea 2      | L 0:40    | L 1:55  | L 1:05  | L\* 4:15 | L\* 4:10 | 5 de 5   |
+| Tarea 3      | L 2:00    | L 1:15  | L\* 3:20 | L 2:25  | L\* 4:05 | 5 de 5   |
+| Tarea 4      | L 1:00    | L 1:20  | L 2:35  | L\* 3:05 | L\* 4:45 | 5 de 5   |
+| Tarea 5      | L 1:50    | L 3:05  | L 4:40  | L 2:20  | NL 4:30  | 4 de 5   |
+| Tarea 6      | NL 4:50   | NL 5:20 | NL 5:15 | NL 5:30 | NL 6:40  | 0 de 5   |
+| Tarea 7      | L 2:50    | L 1:40  | L 3:05  | L 1:45  | L\* 4:50 | 5 de 5   |
+| **Total**    | **14:40** | **16:45** | **22:10** | **23:00** | **32:20** |        |
+
+Referencias: L = logró sin ayuda; L\* = logró con ayuda del moderador; NL = no logró. El tiempo es el de ejecución de cada tarea.
+
+Sobre 35 tareas ejecutadas (cinco participantes por siete tareas), 29 se completaron y 6 fallaron. De las completadas, 20 fueron sin ayuda del moderador y 9 requirieron intervención. La tarea 6, detección de perillas, es la única que falló para la totalidad de los participantes y concentra a la vez el mayor tiempo promedio del estudio.
+
+Los tiempos totales por sesión van de 14:40 a 32:20. Esa dispersión responde al nivel de alfabetización tecnológica de cada participante y no a la presencia de discapacidad: **Mónica, única participante con discapacidad visual, completó la sesión más rápido que dos participantes videntes.** Es la confirmación más directa de la premisa del proyecto — el diseño accesible no es una versión degradada del producto.
+
+### Hallazgos
+
+**El silencio de la app es ambiguo.** Eco narra los resultados positivos pero no avisa cuando está procesando, cuando no encuentra nada o cuando algo falla. En la tarea 4, cuatro de cinco participantes se quedaron esperando una respuesta hablada que nunca llegó, y dos repitieron la foto creyendo que la app se había colgado. Fernanda esperó casi dos minutos en silencio. Mónica lo formuló como principio: *"El resultado negativo también es un resultado, tiene que decirlo en voz alta igual que cuando encuentra algo"*.
+
+El diagnóstico posterior confirmó la causa: el patrón de canal único descrito en §1.1 se implementó en `/afinador` y `/pedal`, pero en `/partitura` los estados de proceso quedaron viajando únicamente por la región `aria-live`. Para quien usa un lector de pantalla eso alcanza; para los cinco participantes del test, que no lo usaban, la pantalla era muda. La accesibilidad correctamente etiquetada no sustituye al feedback audible propio.
+
+**El menú no coincide con lo que el usuario busca.** El metrónomo está dentro de Partitura, la vibración dentro de Ajustes y el contraste dentro de un control llamado "Color". Los cinco participantes tropezaron con las tres. Thiago recorrió la barra inferior, después Ajustes y recién tercero entró a Partitura: *"estaba el botón Ir al metrónomo, no lo hubiera buscado ahí nunca"*. Mónica y Dolores buscaron literalmente la palabra "contraste" en Ajustes y no la encontraron, porque el control se llama "Color".
+
+**Solo los músicos detectan los errores.** Francisco y Mónica notaron que el afinador anunciaba "afinado" con la cuerda todavía levemente baja, y que faltaban acordes en el resultado del OCR. Los otros tres dieron esos mismos resultados por correctos, sin forma de evaluarlos. Dolores lo dijo explícitamente: *"Yo no sé si están todos, la verdad. Para mí está bien porque me los mostró"*.
+
+Este hallazgo extiende el principio ya enunciado en §2.3 sobre la detección de pedal. No basta con que el sistema no mienta: cuando el usuario no puede verificar el resultado —sea porque no ve, sea porque no sabe de música— la interfaz tiene que comunicar su propio grado de certeza. Un resultado presentado con más seguridad de la que tiene es un error de accesibilidad, no de precisión.
+
+**La detección de perillas no funciona.** Falló para los cinco participantes, incluido el músico experto, con el mayor tiempo promedio del estudio. Los intentos fueron entre cuatro y seis por persona, variando distancia, ángulo e iluminación. Dos elementos del diseño sí funcionaron: las instrucciones habladas resultaron claras para todos, y la abstención explícita fue valorada por la usuaria con discapacidad visual — Mónica: *"Al menos avisa cuando no está seguro, eso está bien"*.
+
+Pero apareció un costo no previsto de la formulación actual del mensaje de fallo. Dolores concluyó *"no sé si estoy haciendo algo mal yo"* y Fernanda *"debo tener el pulso muy tembloroso"*: ninguna de las dos tenía responsabilidad en la falla, y ambas la atribuyeron a su propia técnica. Un mensaje de error que no aclara de quién es la falla la traslada al usuario por defecto.
+
+### Correcciones derivadas
+
+El test produjo el siguiente plan de trabajo, ordenado por impacto observado. Los cambios están pendientes de implementación al momento de escribir esta sección.
+
+| Área | Corrección | Evidencia |
+| --- | --- | --- |
+| Narrador | Retener la primera locución hasta que haya un gesto del usuario, en lugar de perderla | 3 de 5 creyeron que el narrador estaba roto |
+| Narrador | Narrar en `/partitura` los estados de proceso, el resultado vacío y los errores, no solo los positivos | 4 de 5 esperaron una voz que nunca llegó |
+| Bienvenida | Narrar el diálogo inicial y acortar su texto visible | Mónica: *"si fuera ciega esto no lo pasaba"* |
+| Bienvenida | Restituir el indicador de foco del diálogo | Regla de foco visible de `CLAUDE.md` |
+| Navegación | Mover el metrónomo a pantalla independiente con ícono propio en la barra | 5 de 5 lo buscaron ahí |
+| Ajustes | Renombrar el control "Color" para que incluya la palabra contraste | 5 de 5 buscaron "contraste" |
+| Metrónomo | Duplicar el control de vibración dentro de la pantalla del metrónomo | 5 de 5 lo buscaron ahí; Fernanda abandonó la tarea |
+| Metrónomo | Anunciar el BPM con retardo, para que un ajuste largo produzca un anuncio y no veinte | Mónica: *"veinte anuncios para bajar veinte pulsos"* |
+| Metrónomo | Comunicar que la pulsación sostenida acelera el ajuste | Fernanda presionó veinte veces sin descubrirla |
+| Metrónomo | Aumentar la duración del pulso háptico y diferenciar el acento por patrón | Francisco y Mónica, por separado |
+| Afinador | Corregir la numeración de cuerdas, invertida respecto de la convención estándar | 2 participantes necesitaron ayuda para identificar la cuerda |
+| Afinador | Incluir la cuerda en la locución, no solo la nota | Thiago: *"no sé si me lo dijo de la cuerda que toqué o de otra"* |
+| Afinador | Estrechar el umbral de "afinado" y afinar la escala verbal cerca del punto justo | Los dos participantes con oído entrenado |
+| Afinador | Corregir el desborde de la fila de cuerdas con fuente muy grande | Fernanda; coincide con la observación de §1.3 |
+| Partitura | Narrar la lista de acordes al terminar el análisis, sin requerir presionar un botón | Francisco: *"lo tuve que leer"* |
+| Partitura | Enunciar el resultado del OCR como lectura aproximada | Los tres participantes sin formación musical |
+| Pedal | Reformular el mensaje de fallo para que no atribuya la falla al usuario | Dolores y Fernanda |
+
+La precisión de la detección de perillas queda fuera de este plan: es trabajo de algoritmo y no de interfaz, y se aborda por separado (§2.3).
+
+---
+
 # Parte 2 — Desarrollo
 
 ---
@@ -270,7 +367,7 @@ Queda abierto un sesgo sistemático por perspectiva: la cara superior de la peri
 
 ## 2.4 Conclusiones
 
-El proyecto demuestra que es posible construir herramientas musicales que funcionen igual de bien para un usuario ciego que para uno con visión. El afinador es el ejemplo más claro: convierte una tarea puramente visual —mirar una aguja acercarse al centro— en una secuencia hablada que incluye la nota, la dirección del error y su magnitud en centavos, lo que permite afinar fino sin ver la pantalla en ningún momento. La pantalla de pedal aplica el mismo criterio a una tarea de visión física: guía al usuario a apuntar la cámara a un objeto sin requerir exploración visual, y obtiene la máxima puntuación en la evaluación de accesibilidad.
+El proyecto demuestra que es posible construir herramientas musicales que funcionen igual de bien para un usuario ciego que para uno con visión. El afinador es el ejemplo más claro: convierte una tarea puramente visual —mirar una aguja acercarse al centro— en una secuencia hablada que incluye la nota, la dirección del error y una estimación verbal de su magnitud, lo que permite afinar sin ver la pantalla en ningún momento. El test de usabilidad confirmó que el flujo funciona —los cinco participantes afinaron de espaldas a la pantalla— y a la vez que esa escala verbal es todavía demasiado gruesa cerca del punto justo (§1.4). La pantalla de pedal aplica el mismo criterio a una tarea de visión física: guía al usuario a apuntar la cámara a un objeto sin requerir exploración visual, y obtiene la máxima puntuación en la evaluación de accesibilidad.
 
 Lo que queda pendiente no es la construcción de las pantallas, que están todas operativas, sino la precisión de las dos funciones basadas en visión por computadora. Ese trabajo es de algoritmo, no de interfaz: la capa de accesibilidad que las envuelve ya está resuelta y no cambia si mejora el reconocimiento.
 
