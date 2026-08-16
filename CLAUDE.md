@@ -249,3 +249,4 @@ docker-compose up
 | `/metronomo`           | Metrónomo      | BPM + audio/háptico            |
 | `/pedal`               | Detectar pedal | Cámara → mock detección → info |
 | `/ajustes`             | Ajustes        | Tema, fuente, velocidad TTS    |
+| `/informacion`         | Información    | Explicación de cada módulo + FAQ (fuera de la barra de nav) |

@@ -375,6 +375,34 @@ interface EcoSettings {
 
 > **Implementado:** cada preferencia narra su nuevo valor por el TTS de la app y la región del carrusel queda en `off` (prop `liveMode`), para que el lector de pantalla no lea el valor dos veces. La pantalla tiene una única región `aria-live` compartida por las cinco preferencias, que actúa de fallback si el navegador no soporta Web Speech. La velocidad del narrador se narra a la velocidad recién elegida. Ver DECISIONS.md, entrada del 2026-08-16.
 
+> **Implementado:** el encabezado incluye a la derecha un link circular con ícono de información (`aria-label="Información y preguntas frecuentes"`, target de 44×44) hacia `/informacion`. `PageHeader` recibió para eso una prop opcional `action`, que se renderiza después del `<h1>` en el DOM.
+
+### 6.6 Información (`/informacion`)
+
+> **Implementado:** pantalla no prevista en la especificación original. El test de usabilidad mostró que el diálogo de bienvenida era el único lugar donde se explicaba qué hace cada módulo, y que nadie lo leía entero —Dolores: *"hay un cartel largo acá… lo leo o lo salteo"*—. Al acortar el diálogo (§6.7) esa información necesitaba un lugar permanente al que volver.
+
+**Propósito:** explicar qué hace cada pantalla, cómo se usa, y responder las dudas frecuentes.
+
+**Comportamiento:**
+
+- Ocho secciones: qué es Eco, una por cada uno de los cinco módulos, opciones de accesibilidad y preguntas frecuentes.
+- Cada sección es un `<details>` nativo colapsado por defecto, con el `<h2>` dentro del `<summary>` para conservar la navegación por encabezados. El triángulo nativo se oculta y se dibuja un chevron propio que rota al abrir; el estado expandido lo sigue aportando el `<details>`, sin ARIA agregado.
+- Al abrir una sección se narra su contenido por TTS; al cerrarla, la locución se corta (`cancelSpeech`). El usuario elige qué escuchar en vez de atravesar la pantalla entera.
+
+**Navegación:** no es un ítem de la barra de navegación —que se mantiene en cinco—. Se entra desde el botón de información de `/ajustes` y se sale por un botón circular de flecha dentro del propio encabezado (`aria-label="Volver a Ajustes"`), primero en el DOM para que sea el primer elemento focusable de la página. `PageHeader` recibió para eso una segunda prop opcional, `back`.
+
+### 6.7 Diálogo de bienvenida (overlay)
+
+> **Implementado:** overlay no previsto en la especificación original. Se muestra una sola vez por dispositivo (`localStorage`, clave `eco-welcome-seen`) al primer ingreso, sobre cualquier pantalla.
+
+**Comportamiento:**
+
+- Resumen visible de tres frases: qué es Eco, qué hace y cómo seguir. El mismo texto es el que se narra, así no pueden desincronizarse.
+- El detalle completo —qué es, qué resuelve, las cinco funciones y las opciones de accesibilidad— vive en un `<details>` colapsado. Leer esa lista entera en voz alta dura casi un minuto: nadie la espera, y quien la quiera la tiene a un control de distancia.
+- Botón "Escuchar explicación" que narra el resumen a pedido, y narración automática del resumen al abrir.
+- Es la pantalla previa al primer gesto del usuario, donde el navegador descarta la síntesis de voz. Se apoya en la retención de `lib/tts`: la locución sale con el primer `pointerdown`/`keydown`. Si ese gesto es el propio botón "Comenzar", el cierre llama `cancelSpeech()` para que el resumen no arranque con el diálogo ya cerrado.
+- Foco inicial en el botón "Comenzar" (`autoFocus`), no en el contenedor del diálogo: el indicador de foco queda visible sobre un elemento accionable, sin recurrir a `outline-none`.
+
 ---
 
 ## 7. PWA
