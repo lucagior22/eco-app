@@ -15,7 +15,8 @@ Esto es importante porque la implementación anterior usaba **oemer**, un OMR (O
 ## Pipeline
 
 ```
-imagen o PDF (FormData "image")
+captura de cámara (1920 ideal) o archivo subido
+  └─ imagen o PDF (FormData "image")
   └─ si es PDF: pdftoppm -png -r 300 -singlefile (solo página 1)
        └─ tesseract <img> <base> --psm 4 -c tessedit_char_whitelist=... tsv
             └─ parseTsv           → descarta palabras con conf < 40
@@ -73,6 +74,16 @@ La implementación con oemer devolvía un `Set`, que perdía tanto el orden como
 
 `sortByReadingOrder` reagrupa por renglón (tolerancia derivada de la altura mediana de las palabras, para no depender de la resolución de la foto) y ordena cada renglón de izquierda a derecha. Es seguro de red frente a fotos donde la segmentación devuelva los bloques desordenados.
 
+### Resolución de captura
+
+El OCR no puede compensar una captura insuficiente, y durante un tiempo la pantalla se la entregó sistemáticamente. `ScoreUpload` pedía la cámara con solo `facingMode: 'environment'`; sin constraint de resolución el navegador entrega típicamente **640×480**, y `captureFrame` manda ese frame tal cual al endpoint.
+
+El orden de magnitud dice todo lo que hace falta: una hoja A4 completa a 640 px de ancho deja cada letra del cifrado en unos **6-8 px de alto**, contra los **~20-30 px** que Tesseract necesita para reconocer un glifo con fiabilidad. No es un caso de precisión degradada — es un caso donde no hay información suficiente que reconocer.
+
+Por eso la cámara pide ahora `width`/`height: { ideal: 1920 }`, el mismo constraint que `hooks/useCamera.ts` ya aplicaba en `/pedal` por una razón análoga (distinguir círculos chicos). El camino de archivo subido nunca tuvo este problema: una foto de galería o un PDF llegan a resolución completa.
+
+**Consecuencia para los umbrales de abajo:** las confianzas 73-97 de la tabla de validación se midieron sobre una hoja sintética a resolución completa. Las de fotos reales tomadas con la cámara de la app, antes de este cambio, no son comparables — y después del cambio tampoco están medidas todavía.
+
 ### Timeout de 30 s
 
 Tesseract responde en segundos. Los 60 s originales estaban dimensionados para oemer, que según su documentación necesita 3–5 minutos *con GPU* — es decir, el timeout anterior tampoco alcanzaba para la herramienta para la que se había fijado.
@@ -98,6 +109,8 @@ Probado de punta a punta dentro del contenedor Docker, contra el endpoint real:
 - **PDF: solo la primera página**, rasterizada a 300 dpi. Se probaron 400 y 600 dpi y el reconocimiento **empeoró** (a 600 dpi no detectó nada), así que 300 no es un default arbitrario.
 - **Sin preprocesamiento de imagen.** Tesseract binariza internamente (Otsu), pero una foto con sombra fuerte, perspectiva marcada o poca resolución degrada el reconocimiento. Si hace falta, el próximo paso sería deskew y binarización adaptativa con OpenCV, que ya está instalado en la imagen para `/pedal`.
 - **La validación se hizo con una hoja sintética**, no con partituras reales fotografiadas. Los umbrales están calibrados contra ese material y conviene revisarlos con fotos reales.
+- **La confianza por palabra no sale del endpoint.** `parseTsv` la usa como compuerta (`CONF_MIN`) y descarta el número. La pantalla, por lo tanto, no puede distinguir un acorde leído con 95 de uno leído con 45, y presenta a los dos igual. La mitigación actual es un aviso fijo de lectura aproximada en `/partitura`; propagar `conf` para modularlo quedó pendiente hasta tener mediciones con fotos reales a la resolución nueva (ver `DECISIONS.md`, entrada del 2026-08-16).
+- **La confianza no detecta omisiones.** Es el límite de fondo de cualquier mejora por confianza: un acorde que Tesseract nunca reconoció no aparece en el TSV, así que no hay valor bajo que reportar. Una lista incompleta y una lista completa se ven idénticas desde el lado del servidor.
 
 ---
 

@@ -51,21 +51,29 @@ export default function HarmonyList({ chords, status, errorMessage, onNarrate }:
 
           {status === 'done' && chords.length === 0 && (
             <p className="text-[var(--color-text-secondary)]">
-              No se detectaron acordes en la partitura.
+              No se detectaron acordes en la imagen. Probá con una foto más nítida o con el
+              cifrado bien visible.
             </p>
           )}
 
           {status === 'done' && chords.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-[var(--color-text-primary)]">
-                  Acordes detectados
-                </h2>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-[var(--color-text-primary)]">
+                    Acordes detectados
+                  </h2>
+                  {/* Mismo texto que la locución del resultado. Sin role="alert" ni live region:
+                      el canal único ya lo dijo y duplicarlo lo hace sonar dos veces. */}
+                  <p className="text-sm text-(--color-text-secondary)">
+                    La lectura puede tener errores u omisiones.
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={onNarrate}
                   aria-label="Narrar todos los acordes detectados"
-                  className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white focus:outline-2 focus:outline-[var(--color-accent)] focus:outline-offset-2"
+                  className="shrink-0 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white focus:outline-2 focus:outline-[var(--color-accent)] focus:outline-offset-2"
                 >
                   Narrar acordes
                 </button>

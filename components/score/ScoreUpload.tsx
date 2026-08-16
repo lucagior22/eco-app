@@ -34,8 +34,16 @@ export default function ScoreUpload({ onFile, onError, isLoading }: ScoreUploadP
   async function startCamera() {
     setCameraError(null)
     try {
+      // Se pide resolución alta explícita, igual que hooks/useCamera.ts: sin esto el navegador
+      // entrega un stream de baja resolución (ej. 640x480) y `captureFrame` manda ese frame tal
+      // cual al OCR. Una hoja A4 a 640x480 deja cada letra del cifrado en 6-8 px de alto, muy por
+      // debajo de los ~20-30 px que Tesseract necesita: el camino de foto no puede funcionar.
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1920 },
+        },
       })
       streamRef.current = stream
       setCameraStatus('active')
@@ -114,8 +122,27 @@ export default function ScoreUpload({ onFile, onError, isLoading }: ScoreUploadP
       {/* Sin role="alert": el texto ya viaja por el canal único del padre. */}
       {cameraError && <p className="text-sm text-red-600">{cameraError}</p>}
 
+      {/* "Tomar foto" va primero en el DOM y con el doble de ancho: es el camino primario en
+          móvil. Los dos cambios se reparten por breakpoint — abajo de `sm` el contenedor es
+          columna y la jerarquía la da el orden vertical; en `sm:flex-row` la da el ancho.
+          El orden importa además para el teclado: el elemento focusable de "Subir archivo" es
+          el <input class="sr-only">, no el <label>, así que input y label viajan juntos. */}
       <div className="flex flex-col gap-3 sm:flex-row">
-        {/* Input file oculto — activado por el label/botón de abajo */}
+        <button
+          type="button"
+          onClick={startCamera}
+          disabled={isLoading}
+          aria-label="Abrir cámara para fotografiar la partitura"
+          className={`flex flex-2 items-center justify-center gap-2 rounded-lg bg-(--color-accent) px-4 py-3 font-medium text-white transition-opacity focus:outline-2 focus:outline-(--color-accent) focus:outline-offset-2 ${isLoading ? 'cursor-not-allowed opacity-50' : ''}`}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+            <circle cx="12" cy="13" r="4" />
+          </svg>
+          Tomar foto
+        </button>
+
+        {/* Input file oculto — activado por el label de al lado */}
         <input
           ref={fileInputRef}
           id="score-file-input"
@@ -137,20 +164,6 @@ export default function ScoreUpload({ onFile, onError, isLoading }: ScoreUploadP
           </svg>
           Subir archivo
         </label>
-
-        <button
-          type="button"
-          onClick={startCamera}
-          disabled={isLoading}
-          aria-label="Abrir cámara para fotografiar la partitura"
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg bg-(--color-accent) px-4 py-3 font-medium text-white transition-opacity focus:outline-2 focus:outline-(--color-accent) focus:outline-offset-2 ${isLoading ? 'cursor-not-allowed opacity-50' : ''}`}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-            <circle cx="12" cy="13" r="4" />
-          </svg>
-          Tomar foto
-        </button>
       </div>
     </div>
   )

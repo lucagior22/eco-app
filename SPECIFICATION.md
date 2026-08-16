@@ -252,6 +252,12 @@ Cinco ítems siempre visibles: Partitura, Metrónomo, Pedal, Afinador, Ajustes.
 
 > **Implementado:** el paso 6 ya no existe. El metrónomo es una pantalla de primer nivel accesible desde la barra de navegación (§5), no un destino de `/partitura`.
 
+> **Implementado:** "Tomar foto" pide además `width`/`height: { ideal: 1920 }`. Con solo `facingMode` el navegador entrega un stream de baja resolución (típicamente 640×480), y ese frame va tal cual al OCR: una hoja A4 a esa resolución deja cada letra del cifrado en 6-8 px de alto, contra los ~20-30 px que Tesseract necesita. En el test de usabilidad una participante sacó cuatro fotos sin obtener resultado. Es el mismo constraint que `hooks/useCamera.ts` ya aplicaba en `/pedal`.
+
+> **Implementado:** "Tomar foto" va primero en el DOM y con el doble de ancho que "Subir archivo". Es el camino primario en móvil y antes los dos botones eran `flex-1`, del mismo peso y con "Subir archivo" primero en el orden de foco. La jerarquía se reparte por breakpoint: abajo de `sm` la da el orden vertical, en `sm:flex-row` la da el ancho.
+
+> **Implementado:** el paso 4 no es solo un estado visual. La espera se narra al arrancar ("Analizando la partitura, esto puede tardar unos segundos"), se repite un recordatorio a los 10 s y hay un corte del lado del cliente a los 35 s con mensaje propio — por encima del timeout de 30 s del endpoint, para que en el caso normal gane el mensaje de error real del servidor.
+
 **Endpoint `/api/ocr`:**
 
 - Método: POST, multipart/form-data, campo `image`
@@ -270,6 +276,8 @@ Cinco ítems siempre visibles: Partitura, Metrónomo, Pedal, Afinador, Ajustes.
 - Botones de "Subir" y "Tomar foto" tienen labels descriptivos
 
 > **Implementado:** los estados de proceso, el resultado (incluido el vacío) y los errores se narran por el TTS de la app; la región `aria-live` de la pantalla es su fallback y queda en `off` mientras el navegador soporte Web Speech. La región vive en `PartituraContent`, no en `HarmonyList`, porque el texto tiene que salir de una fuente única. El error de cámara de `ScoreUpload` viaja por el mismo canal en vez de por un `role="alert"` propio. Ver DECISIONS.md, entrada del 2026-08-16.
+
+> **Implementado:** al terminar el análisis la lista **se narra sola**, sin necesidad de presionar ningún botón: `buildResultSpeech` arma conteo + aviso de aproximación + los primeros 3 acordes + "y N acordes más". Se leen 3 y no la lista completa porque una locución larga no se puede cortar salvo saliendo de la pantalla; el botón "Narrar acordes" queda como repetición a pedido y ahí sí lee la lista entera. El aviso de aproximación ("La lectura puede tener errores u omisiones") va en la locución y en pantalla, y es fijo: sobre partituras reales el OCR confunde acordes y omite otros, y la confianza de Tesseract no cubre el caso de la omisión —un acorde que nunca se detectó no tiene confianza baja que reportar, simplemente no aparece—.
 
 ---
 

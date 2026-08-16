@@ -8,6 +8,23 @@ el código se reemplaza `Pendiente` por la fecha y se elimina la línea de estad
 
 ---
 
+## 2026-08-16 — Resolución de captura y presentación aproximada en `/partitura`
+
+**Decisión:** la cámara de `ScoreUpload` pide `width`/`height: { ideal: 1920 }`, la espera del OCR pasa a tener feedback sostenido (recordatorio a los 10 s y corte del cliente a los 35 s), y el resultado se narra solo, enunciado siempre como lectura aproximada.
+
+**Razones:**
+El test de usabilidad reportó cuatro problemas de narración en la pantalla, pero el análisis del código encontró una causa anterior que ninguno de los cuatro nombraba: `ScoreUpload` llamaba a `getUserMedia` con solo `facingMode: 'environment'`, sin constraint de resolución. El navegador entrega ahí un stream de baja resolución —típicamente 640×480— y `captureFrame` manda ese frame tal cual a Tesseract. Una hoja A4 a esa resolución deja cada letra del cifrado en 6-8 px de alto, contra los ~20-30 px que el OCR necesita: **el camino de foto no podía funcionar**, con o sin narración. Eso explica el peor síntoma medido —una participante sacó cuatro fotos y esperó casi dos minutos, otra repitió dos veces creyendo que la app se había colgado— mejor que la falta de feedback sola.
+
+`/pedal` ya había resuelto esto y lo tenía comentado en `hooks/useCamera.ts`. `ScoreUpload` no usa el hook —lo necesita bajo demanda, con start/stop explícitos, y el hook arranca en un efecto de montaje— así que quedó con su propio `getUserMedia` inline y nunca recibió el arreglo. Se replicaron los constraints en vez de adaptar el hook: generalizarlo obligaba a tocar `/pedal`, que hoy funciona.
+
+**Sobre la narración de la espera:** el anuncio de inicio ya existía. Lo que faltaba era duración — una frase de 1,5 s seguida de silencio hasta que respondiera el servidor, que puede tardar los 30 s del timeout del endpoint. El corte del cliente se fijó deliberadamente **por encima** de ese timeout (35 s): así el servidor gana en el caso normal y el usuario escucha su mensaje de error real, y el abort cubre solo lo que queda colgado más allá (red lenta, subida trabada).
+
+**Por qué se narran 3 acordes y no la lista completa:** narrarla entera al terminar es lo que pedía el hallazgo, pero una progresión puede tener decenas de acordes y no hay forma de cortar una locución larga salvo saliendo de la pantalla. El anuncio automático da conteo, aviso y los primeros 3; el botón "Narrar acordes" deja de ser el único acceso al resultado y pasa a ser la repetición completa a pedido.
+
+**Por qué el aviso de aproximación es fijo y no derivado de la confianza del OCR:** se evaluó propagar la columna `conf` del TSV de Tesseract, que hoy `parseTsv` usa como compuerta y descarta, para modular el aviso como hace `/pedal` con sus perillas. Se descartó por dos razones. Primero, la confianza no cubre el caso que motivó el hallazgo: los participantes dieron por completa una lista a la que le faltaban acordes, y un acorde que Tesseract nunca detectó no tiene confianza baja que reportar — simplemente no aparece en el TSV. El aviso de omisión hace falta igual. Segundo, los umbrales de referencia (cifrado legítimo entre 73 y 97) salen de una hoja sintética, y el cambio de resolución de captura mueve esa distribución por completo: cualquier umbral definido antes de medir con fotos reales habría que recalibrarlo. Queda como revisión posterior, con datos propios.
+
+---
+
 ## 2026-08-16 — Ventana adaptativa de enganche y seguimiento en el afinador
 
 **Decisión:** el filtrado de lecturas espurias del afinador deja de ser una ventana fija de aceptación y pasa a tener dos regímenes. `centsToTarget` conserva su ventana ancha de ±200 cents para **enganchar**, y `useTuner` agrega un **seguimiento** angosto de ±60 cents: con una estimación ya establecida, se descarta la lectura que se aleje más de eso, y si el rechazo persiste ocho lecturas se vuelve a enganchar. Por encima de ±200 no se descarta nada: ahí es otra cuerda, no un error.
