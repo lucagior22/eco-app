@@ -7,14 +7,21 @@ import {
   closestStringIndex,
   centsToTarget,
   correctOctave,
+  foldToOctaveOf,
+  tuningStep,
+  tuningDirection,
+  tuningStepLabel,
+  stringNumber,
   GUITAR_STRINGS,
   NOTE_NAMES_ES,
 } from '@/lib/pitch'
-import type { DetectedNote } from '@/lib/pitch'
+import type { DetectedNote, TuningStep } from '@/lib/pitch'
 import { speak, cancelSpeech } from '@/lib/tts'
 import type { EcoSettings } from '@/lib/settings'
 
-export type TuningStatus = 'tuned' | 'high' | 'low' | 'silent'
+// 'waiting' = todavía no se detectó ninguna señal; 'silent' = había señal y se perdió.
+// Son dos situaciones distintas para quien no ve: "tocá algo" vs "dejé de oírte".
+export type TuningStatus = 'tuned' | 'high' | 'low' | 'silent' | 'waiting'
 
 export interface TunerState {
   detectedNote: DetectedNote | null
@@ -25,10 +32,19 @@ export interface TunerState {
   toggle: () => void
 }
 
-const CENTS_THRESHOLD_ENTER = 10
-const CENTS_THRESHOLD_STAY = 20
+// 15-20 cents son claramente audibles: con los umbrales anteriores (10/20) la app decía
+// "afinado" con la cuerda todavía baja al oído. La histéresis se conserva para evitar el
+// parpadeo entre estados, pero dentro de un rango que ya no se escucha.
+const CENTS_THRESHOLD_ENTER = 5
+const CENTS_THRESHOLD_STAY = 10
 const TTS_COOLDOWN_MS = 3000
-const FFT_SIZE = 4096
+// pitchfinder descarta la mitad del buffer y usa la mitad de eso como lags (ver yin.js):
+// con 4096 quedan 1024 lags, apenas ~1,8 períodos de Mi grave (82 Hz) para correlacionar,
+// que es donde el detector se vuelve inestable. Con 8192 son ~3,5 períodos.
+const FFT_SIZE = 8192
+// YIN es O(lags²): a 8192 no entra en cada frame de animación en un teléfono. 50 ms da
+// 20 lecturas por segundo, suficiente para llenar la ventana de mediana en 250 ms.
+const DETECT_INTERVAL_MS = 50
 const HOLD_MS = 2000
 const MEDIAN_WINDOW = 5
 // Band-pass: las fundamentales de cuerda al aire van de E2 (82 Hz) a E4 (330 Hz).
@@ -39,18 +55,22 @@ const LOWPASS_HZ = 1000
 const JUMP_THRESHOLD_CENTS = 200
 const EMA_ALPHA = 0.4
 
-const DEVIATION_MEDIUM_CENTS = 25
-const DEVIATION_STRONG_CENTS = 45
+// Ventana de seguimiento. Con una estimación ya establecida, una lectura que se aleje más de
+// esto no es la cuerda moviéndose —girando la clavija el tono se mueve unos pocos cents entre
+// lecturas— sino un frame en que YIN enganchó un período equivocado. Es lo que evita el
+// "muy baja" súbito sin que nadie toque nada. Por encima de JUMP_THRESHOLD_CENTS sí se acepta
+// de una: ahí es otra cuerda, no un error.
+const TRACK_WINDOW_CENTS = 60
+// Si el rechazo persiste, la estimación es la que quedó vieja: re-enganchar (~400 ms).
+const TRACK_LOST_FRAMES = 8
 
-function deviationSuffix(cents: number): string {
-  const magnitude =
-    Math.abs(cents) >= DEVIATION_STRONG_CENTS
-      ? 'Muy'
-      : Math.abs(cents) >= DEVIATION_MEDIUM_CENTS
-        ? 'Medianamente'
-        : 'Un poco'
-  return `${magnitude} ${cents > 0 ? 'alto' : 'bajo'}.`
-}
+// Un escalón nuevo debe sostenerse estos frames antes de locutarse: evita la metralleta
+// cuando la desviación oscila justo sobre el borde entre dos escalones.
+const STEP_STABLE_FRAMES = 3
+
+// Cercanía a afinado. Sirve para detectar que el escalón mejora y saltear el cooldown:
+// avisar del acercamiento en el momento es lo que evita pasarse de largo con la clavija.
+const STEP_RANK: Record<TuningStep, number> = { tuned: 0, almost: 1, slight: 2, off: 3, far: 4 }
 
 export function useTuner(
   stream: MediaStream | null,
@@ -59,7 +79,7 @@ export function useTuner(
   targetStringIndex: number | null,
 ): TunerState {
   const [detectedNote, setDetectedNote] = useState<DetectedNote | null>(null)
-  const [status, setStatus] = useState<TuningStatus>('silent')
+  const [status, setStatus] = useState<TuningStatus>('waiting')
   const [activeStringIndex, setActiveStringIndex] = useState<number | null>(null)
   const [isListening, setIsListening] = useState(true)
   const [announcement, setAnnouncement] = useState('')
@@ -69,15 +89,21 @@ export function useTuner(
   const ttsSpeedRef = useRef(ttsSpeed)
   const targetStringIndexRef = useRef(targetStringIndex)
   const lastTtsTimeRef = useRef(0)
-  const lastNoteKeyRef = useRef('')
-  const lastStatusRef = useRef<TuningStatus>('silent')
-  const committedStatusRef = useRef<TuningStatus>('silent')
+  const committedStatusRef = useRef<TuningStatus>('waiting')
+  const lastSpokenKeyRef = useRef('')
+  const lastSpokenRankRef = useRef(STEP_RANK.far)
+  const spokenDirectionRef = useRef<'high' | 'low' | null>(null)
+  const lastStringIdxRef = useRef<number | null>(null)
+  const pendingStepKeyRef = useRef('')
+  const pendingCountRef = useRef(0)
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const freqHistoryRef = useRef<number[]>([])
   const isSpeakingRef = useRef(false)
   const nullCountRef = useRef(0)
   const smoothedFreqRef = useRef<number | null>(null)
   const speechGenRef = useRef(0)
+  const lastDetectAtRef = useRef(0)
+  const trackLostRef = useRef(0)
 
   // Locución por el TTS propio de la app (canal primario). El texto a anunciar se decide
   // antes y se publica también en `announcement` (canal de fallback aria-live); `announce`
@@ -97,6 +123,82 @@ export function useTuner(
     })
   }, [])
 
+  // Cierra el episodio de feedback: lo que sigue se trata como situación nueva y se vuelve
+  // a anunciar con verbo, aunque el escalón coincida con el último dicho.
+  const resetFeedback = useCallback(() => {
+    // También el cooldown: al abrir un episodio nuevo no hay locución previa que espaciar, y
+    // ahora que el nombre de la cuerda no se repite es la primera frase la que más importa.
+    lastTtsTimeRef.current = 0
+    lastSpokenKeyRef.current = ''
+    lastSpokenRankRef.current = STEP_RANK.far
+    spokenDirectionRef.current = null
+    lastStringIdxRef.current = null
+    pendingStepKeyRef.current = ''
+    pendingCountRef.current = 0
+  }, [])
+
+  // Toda la política de repetición vive acá para que los dos modos (cuerda fija y automático)
+  // no divergan.
+  const speakFeedback = useCallback(
+    (stringIdx: number, cents: number, isTuned: boolean) => {
+      const step = tuningStep(cents, isTuned)
+      const direction = tuningDirection(cents, isTuned)
+      const key = `${stringIdx}|${step}|${direction}`
+
+      if (key !== pendingStepKeyRef.current) {
+        pendingStepKeyRef.current = key
+        pendingCountRef.current = 1
+        return
+      }
+      if (++pendingCountRef.current < STEP_STABLE_FRAMES) return
+      if (key === lastSpokenKeyRef.current) return
+
+      const changedString = stringIdx !== lastStringIdxRef.current
+      if (changedString) spokenDirectionRef.current = null
+
+      const rank = STEP_RANK[step]
+      const improved = rank < lastSpokenRankRef.current
+      const reversed =
+        direction !== 'none' &&
+        spokenDirectionRef.current !== null &&
+        direction !== spokenDirectionRef.current
+
+      // El cooldown frena la repetición del mismo problema, pero no debe tapar lo que cambió:
+      // acercarse a afinado, pasarse de largo o saltar a otra cuerda hay que avisarlo al instante.
+      const now = Date.now()
+      if (
+        now - lastTtsTimeRef.current <= TTS_COOLDOWN_MS &&
+        !improved &&
+        !reversed &&
+        !changedString
+      ) {
+        return
+      }
+
+      spokenDirectionRef.current = direction === 'none' ? null : direction
+
+      // Mientras se sigue la misma cuerda, nombrarla en cada locución solo alarga la espera:
+      // el usuario está girando la clavija y lo único nuevo es qué tan cerca está. El nombre
+      // vuelve cuando cambia la cuerda o cuando se cierra el episodio (silencio, pausa).
+      let prefix = ''
+      if (changedString) {
+        const label = GUITAR_STRINGS[stringIdx].label
+        prefix = `Cuerda ${stringNumber(stringIdx)}, ${NOTE_NAMES_ES[label] ?? label}. `
+      }
+
+      const text = `${prefix}${tuningStepLabel(step, direction)}.`
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
+      setAnnouncement(text)
+      if (ttsEnabledRef.current) announce(text)
+
+      lastTtsTimeRef.current = now
+      lastSpokenKeyRef.current = key
+      lastSpokenRankRef.current = rank
+      lastStringIdxRef.current = stringIdx
+    },
+    [announce],
+  )
+
   useEffect(() => { ttsEnabledRef.current = ttsEnabled }, [ttsEnabled])
   useEffect(() => { ttsSpeedRef.current = ttsSpeed }, [ttsSpeed])
   useEffect(() => {
@@ -104,33 +206,39 @@ export function useTuner(
     freqHistoryRef.current = []
     smoothedFreqRef.current = null
     nullCountRef.current = 0
-    committedStatusRef.current = 'silent'
+    committedStatusRef.current = 'waiting'
+    resetFeedback()
 
     // Sin stream todavía no hay afinador: anunciar el modo mientras el navegador pide el permiso
     // pisaría el aviso del permiso, que es lo único accionable en ese momento. Con `stream` en las
     // dependencias, el modo se anuncia recién cuando el micrófono está activo.
     if (!stream) return
 
-    const text = targetStringIndex === null
-      ? 'Modo automático'
-      : `Afinando ${NOTE_NAMES_ES[GUITAR_STRINGS[targetStringIndex].label] ?? GUITAR_STRINGS[targetStringIndex].label}`
+    let text: string
+    if (targetStringIndex === null) {
+      text = 'Modo automático. Tocá una cuerda.'
+    } else {
+      const label = GUITAR_STRINGS[targetStringIndex].label
+      text = `Afinando cuerda ${stringNumber(targetStringIndex)}, ${NOTE_NAMES_ES[label] ?? label}.`
+      // Este anuncio ya presentó la cuerda: la primera locución de feedback no tiene que repetirla.
+      lastStringIdxRef.current = targetStringIndex
+    }
     setAnnouncement(text)
     if (ttsEnabledRef.current) announce(text)
-  }, [targetStringIndex, stream, announce])
+  }, [targetStringIndex, stream, announce, resetFeedback])
 
   useEffect(() => {
     isListeningRef.current = isListening
     if (!isListening) {
       cancelSpeech()
       setDetectedNote(null)
-      setStatus('silent')
+      setStatus('waiting')
       setActiveStringIndex(null)
       setAnnouncement('')
-      lastNoteKeyRef.current = ''
-      lastStatusRef.current = 'silent'
-      committedStatusRef.current = 'silent'
+      committedStatusRef.current = 'waiting'
+      resetFeedback()
     }
-  }, [isListening])
+  }, [isListening, resetFeedback])
 
   useEffect(() => {
     if (!stream) return
@@ -163,10 +271,51 @@ export function useTuner(
 
     const buffer = new Float32Array(FFT_SIZE)
 
+    // Seguimiento + mediana + EMA, en los dos modos. La mediana descarta los frames en que YIN
+    // falla (el descenso al mínimo de la función de diferencia solo avanza hacia lags mayores,
+    // así que con un mínimo poco profundo se pasa de largo y devuelve una frecuencia baja) y la
+    // EMA quita el temblor de los frames buenos. Devuelve null si la lectura se descarta.
+    const smoothFrequency = (freq: number): number | null => {
+      const smoothed = smoothedFreqRef.current
+      if (smoothed !== null) {
+        const drift = Math.abs(1200 * Math.log2(freq / smoothed))
+        if (drift > TRACK_WINDOW_CENTS && drift <= JUMP_THRESHOLD_CENTS) {
+          if (++trackLostRef.current < TRACK_LOST_FRAMES) return null
+        }
+      }
+      trackLostRef.current = 0
+
+      const history = freqHistoryRef.current
+      if (history.length > 0) {
+        const jumpCents = Math.abs(1200 * Math.log2(freq / history[history.length - 1]))
+        if (jumpCents > TRACK_WINDOW_CENTS) {
+          freqHistoryRef.current = []
+          smoothedFreqRef.current = null
+        }
+      }
+      freqHistoryRef.current.push(freq)
+      if (freqHistoryRef.current.length > MEDIAN_WINDOW) freqHistoryRef.current.shift()
+
+      const sorted = [...freqHistoryRef.current].sort((a, b) => a - b)
+      const medianFreq = sorted[Math.floor(sorted.length / 2)]
+      smoothedFreqRef.current =
+        smoothedFreqRef.current === null
+          ? medianFreq
+          : EMA_ALPHA * medianFreq + (1 - EMA_ALPHA) * smoothedFreqRef.current
+      return smoothedFreqRef.current
+    }
+
     const loop = () => {
       if (!active) return
       rafId = requestAnimationFrame(loop)
       if (!isListeningRef.current || isSpeakingRef.current) return
+
+      // YIN es O(n²) sobre el buffer. Con FFT_SIZE 8192 correrlo en cada frame de animación
+      // satura la CPU de un teléfono, y para afinar no aporta: la mediana necesita 5 lecturas,
+      // que a este intervalo son 250 ms.
+      const now = performance.now()
+      if (now - lastDetectAtRef.current < DETECT_INTERVAL_MS) return
+      lastDetectAtRef.current = now
 
       analyser.getFloatTimeDomainData(buffer)
       const rawFreq = detectPitch(buffer, ctx.sampleRate)
@@ -184,8 +333,7 @@ export function useTuner(
             // Estado fresco tras el silencio: si se retoma una cuerda ya afinada, debe
             // tratarse como evento nuevo y volver a anunciar el resultado.
             committedStatusRef.current = 'silent'
-            lastStatusRef.current = 'silent'
-            lastNoteKeyRef.current = ''
+            resetFeedback()
           }, HOLD_MS)
         }
         return
@@ -195,8 +343,15 @@ export function useTuner(
       const targetIdx = targetStringIndexRef.current
       if (targetIdx !== null) {
         const targetFreq = GUITAR_STRINGS[targetIdx].frequency
-        const cents = centsToTarget(rawFreq, targetFreq)
-        if (cents === null) return  // fuera de rango, ignorar
+        // Descartar el frame antes de suavizar: una lectura fuera de la ventana no es esta
+        // cuerda y contaminaría la mediana.
+        if (centsToTarget(rawFreq, targetFreq) === null) return
+
+        // Plegar a la octava del target antes de suavizar, para que una lectura de la octava
+        // vecina promedie con las demás en vez de arrastrar la mediana a un punto intermedio.
+        const freq = smoothFrequency(foldToOctaveOf(rawFreq, targetFreq))
+        if (freq === null) return
+        const cents = 1200 * Math.log2(freq / targetFreq)
 
         nullCountRef.current = 0
         if (holdTimerRef.current) {
@@ -210,55 +365,21 @@ export function useTuner(
           Math.abs(cents) <= threshold ? 'tuned' : cents > 0 ? 'high' : 'low'
 
         const targetNote = frequencyToNote(targetFreq)
-        const displayNote: DetectedNote = { ...targetNote, frequency: rawFreq, cents: Math.round(cents) }
+        const displayNote: DetectedNote = { ...targetNote, frequency: freq, cents: Math.round(cents) }
 
         committedStatusRef.current = newStatus
         setDetectedNote(displayNote)
         setStatus(newStatus)
         setActiveStringIndex(targetIdx)
 
-        const now = Date.now()
-        const statusChanged = newStatus !== lastStatusRef.current
-        const cooldownOk = now - lastTtsTimeRef.current > TTS_COOLDOWN_MS
-
-        // "Afinado" ignora el cooldown: es el resultado más importante y suele alcanzarse
-        // dentro de los 3 s del anuncio previo. statusChanged evita repetirlo mientras se
-        // sostiene afinado; el cooldown sigue limitando los avisos de "un poco alto/bajo".
-        if (statusChanged && (cooldownOk || newStatus === 'tuned')) {
-          const nameEs = NOTE_NAMES_ES[targetNote.note] ?? targetNote.note
-          const suffix = newStatus === 'tuned' ? 'Afinado.' : deviationSuffix(cents)
-          const text = `${nameEs}. ${suffix}`
-          if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-          setAnnouncement(text)
-          if (ttsEnabledRef.current) announce(text)
-          lastTtsTimeRef.current = now
-          lastNoteKeyRef.current = `${targetNote.note}${targetNote.octave}`
-          lastStatusRef.current = newStatus
-        }
+        speakFeedback(targetIdx, cents, newStatus === 'tuned')
         return
       }
 
       // Modo automático: corrección de octava (subarmónico/armónico) + mediana sobre historial.
-      const correctedFreq = correctOctave(rawFreq)
-
-      const history = freqHistoryRef.current
-      if (history.length > 0) {
-        const jumpCents = Math.abs(1200 * Math.log2(correctedFreq / history[history.length - 1]))
-        if (jumpCents > JUMP_THRESHOLD_CENTS) {
-          freqHistoryRef.current = []
-          smoothedFreqRef.current = null
-        }
-      }
-      freqHistoryRef.current.push(correctedFreq)
-      if (freqHistoryRef.current.length > MEDIAN_WINDOW) freqHistoryRef.current.shift()
-
+      const freq = smoothFrequency(correctOctave(rawFreq))
+      if (freq === null) return
       nullCountRef.current = 0
-      const sorted = [...freqHistoryRef.current].sort((a, b) => a - b)
-      const medianFreq = sorted[Math.floor(sorted.length / 2)]
-      smoothedFreqRef.current = smoothedFreqRef.current === null
-        ? medianFreq
-        : EMA_ALPHA * medianFreq + (1 - EMA_ALPHA) * smoothedFreqRef.current
-      const freq = smoothedFreqRef.current
 
       if (holdTimerRef.current) {
         clearTimeout(holdTimerRef.current)
@@ -282,22 +403,7 @@ export function useTuner(
       setStatus(newStatus)
       setActiveStringIndex(closestIdx)
 
-      const now = Date.now()
-      const noteKey = String(closestIdx)
-      const changed = noteKey !== lastNoteKeyRef.current || newStatus !== lastStatusRef.current
-      const cooldownOk = now - lastTtsTimeRef.current > TTS_COOLDOWN_MS
-
-      if (changed && (cooldownOk || newStatus === 'tuned')) {
-        const nameEs = NOTE_NAMES_ES[refString.label] ?? refString.label
-        const suffix = newStatus === 'tuned' ? 'Afinado.' : deviationSuffix(centsFromString)
-        const text = `${nameEs}. ${suffix}`
-        if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
-        setAnnouncement(text)
-        if (ttsEnabledRef.current) announce(text)
-        lastTtsTimeRef.current = now
-        lastNoteKeyRef.current = noteKey
-        lastStatusRef.current = newStatus
-      }
+      speakFeedback(closestIdx, centsFromString, newStatus === 'tuned')
     }
 
     rafId = requestAnimationFrame(loop)
@@ -313,7 +419,7 @@ export function useTuner(
       source.disconnect()
       void ctx.close()
     }
-  }, [stream, announce])
+  }, [stream, speakFeedback, resetFeedback])
 
   const toggle = useCallback(() => {
     setIsListening((prev) => !prev)

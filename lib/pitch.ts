@@ -96,12 +96,27 @@ export function frequencyToNote(frequency: number): DetectedNote {
  * Devuelve los cents de desviación de `freq` respecto a la octava más cercana
  * de `targetFreq`. Permite comparar E3 detectado contra un target E2.
  * Retorna null si la desviación supera el umbral (no es esta cuerda).
+ *
+ * `maxCents` 200 es la ventana de *enganche*, deliberadamente ancha para que una cuerda muy
+ * floja registre igual. El filtrado fino de lecturas espurias lo hace el seguimiento en
+ * useTuner, no esta función: estrechar la ventana acá dejaba muda la cuerda destemplada,
+ * que es justo cuando más se necesita el afinador.
  */
 export function centsToTarget(freq: number, targetFreq: number, maxCents = 200): number | null {
   const raw = 1200 * Math.log2(freq / targetFreq)
   const octaves = Math.round(raw / 1200)
   const cents = raw - octaves * 1200
   return Math.abs(cents) < maxCents ? cents : null
+}
+
+/**
+ * Lleva `freq` a la octava de `targetFreq`. Permite promediar lecturas entre frames en
+ * modo cuerda fija: sin esto, si YIN alterna entre la fundamental y un subarmónico, la
+ * mediana caería en un punto intermedio que no corresponde a ninguna de las dos.
+ */
+export function foldToOctaveOf(freq: number, targetFreq: number): number {
+  const octaves = Math.round(Math.log2(freq / targetFreq))
+  return freq / 2 ** octaves
 }
 
 export function closestStringIndex(frequency: number): number {
@@ -115,4 +130,56 @@ export function closestStringIndex(frequency: number): number {
     }
   }
   return closestIdx
+}
+
+export type TuningStep = 'tuned' | 'almost' | 'slight' | 'off' | 'far'
+export type TuningDirection = 'high' | 'low' | 'none'
+
+const STEP_ALMOST_CENTS = 12
+const STEP_SLIGHT_CENTS = 25
+const STEP_OFF_CENTS = 45
+
+/**
+ * Escalón verbal de afinación. `isTuned` viene del status con histéresis de useTuner y manda:
+ * entre 5 y 10 cents la histéresis sostiene "afinada", y sin este parámetro la escala diría
+ * "casi afinada" contradiciendo a la pantalla.
+ */
+export function tuningStep(cents: number, isTuned: boolean): TuningStep {
+  if (isTuned) return 'tuned'
+  const abs = Math.abs(cents)
+  if (abs < STEP_ALMOST_CENTS) return 'almost'
+  if (abs < STEP_SLIGHT_CENTS) return 'slight'
+  if (abs < STEP_OFF_CENTS) return 'off'
+  return 'far'
+}
+
+export function tuningDirection(cents: number, isTuned: boolean): TuningDirection {
+  if (isTuned) return 'none'
+  return cents > 0 ? 'high' : 'low'
+}
+
+/**
+ * Etiqueta de la escala verbal, compartida por la locución y la pantalla para que no se
+ * contradigan. El escalón "casi afinada" es el que avisa que se está llegando: sin él, quien
+ * gira la clavija escucha "un poco baja" durante todo el trayecto y se pasa de largo.
+ * Género femenino: el sujeto siempre es la cuerda.
+ */
+export function tuningStepLabel(step: TuningStep, direction: TuningDirection): string {
+  if (step === 'tuned' || direction === 'none') return 'Afinada'
+  const side = direction === 'high' ? 'alta' : 'baja'
+  switch (step) {
+    case 'almost':
+      return `Casi afinada, un poco ${side}`
+    case 'slight':
+      return `Un poco ${side}`
+    case 'off':
+      return `Bastante ${side}`
+    case 'far':
+      return `Muy ${side}`
+  }
+}
+
+// GUITAR_STRINGS[0] es Mi grave, que para quien toca es la 6ª cuerda: el índice va al revés.
+export function stringNumber(index: number): number {
+  return GUITAR_STRINGS.length - index
 }

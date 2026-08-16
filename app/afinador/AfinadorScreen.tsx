@@ -12,7 +12,7 @@ import PitchIndicator from '@/components/tuner/PitchIndicator'
 import { Button } from 'react-aria-components'
 
 function getTintColor(status: TuningStatus, cents: number, listening: boolean): string {
-  if (!listening || status === 'silent') return 'transparent'
+  if (!listening || status === 'silent' || status === 'waiting') return 'transparent'
   const ratio = Math.min(Math.abs(cents) / 50, 1)
   const hue = Math.round(120 * (1 - ratio))
   return `hsla(${hue}, 90%, 40%, 0.35)`

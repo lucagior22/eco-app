@@ -70,3 +70,23 @@ El problema central no es la falta de ARIA sino la **arquitectura del canal de s
 1. **Unificar el canal de audio.** Decidir entre TTS de la app o región `aria-live` como fuente única y desactivar la otra (o sincronizarlas con el mismo cooldown). Evita el eco y la verborrea. Documentar en `DECISIONS.md`.
 2. **Exponer la magnitud de la desviación por audio** (cumplir `SPECIFICATION.md:220`): "Desviación: N cents alto/bajo", manteniendo la barra visual `aria-hidden`. Sin esto no se puede afinar fino sin ver.
 3. **Corregir los `aria-pressed` invertidos** de Pausar/Reanudar y Narrador (`AfinadorScreen.tsx:117,127`), y mostrar el selector de micrófono también en mobile (`AfinadorScreen.tsx:137`).
+
+---
+
+## Addendum — estado al 2026-08-16
+
+Las líneas de arriba son el registro de la evaluación del 2026-06-30 y se dejan sin modificar. Lo
+que cerró desde entonces:
+
+| Hallazgo original | Estado |
+| --- | --- |
+| 1 y 4 del resumen (doble voz, `aria-pressed` invertidos) y el selector oculto en mobile | Resueltos (ver `DECISIONS.md`, canal único). |
+| 3 del resumen — magnitud de la desviación no audible | **Mitigado, no cerrado.** La escala verbal pasó de 3 escalones a 5 (`tuningStepLabel` en `lib/pitch.ts`), con "casi afinada" cubriendo la zona crítica, más el verbo de acción "tensá"/"aflojá". Los cents exactos siguen sin narrarse: es deliberado —un número no le dice nada a un principiante— pero deja fuera al usuario avanzado. |
+| UX / visibilidad del estado — "Escuchando…" ambiguo | Resuelto. `TuningStatus` distingue `waiting` ("Tocá una cuerda") de `silent` ("Sin señal"). |
+| UX / estética — `text-8xl` | Ajustado a `clamp(3.5rem, 20vw, 6rem)` junto con el `flex-wrap` de la fila de cuerdas, que desbordaba con la fuente en `xl`. |
+
+El test de usabilidad con usuarios reales (§1.4 de `INFORME.md`) agregó dos hallazgos que esta
+evaluación estática no había detectado, ambos ya corregidos: la **numeración de cuerdas estaba
+invertida** respecto de la convención de guitarra, y la locución **no decía de qué cuerda hablaba**,
+lo que hacía indistinguibles las dos cuerdas Mi. Ninguno de los dos es visible leyendo el código
+contra las reglas de accesibilidad: hacían falta músicos usando la app.

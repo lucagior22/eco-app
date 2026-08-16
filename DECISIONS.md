@@ -8,6 +8,21 @@ el código se reemplaza `Pendiente` por la fecha y se elimina la línea de estad
 
 ---
 
+## 2026-08-16 — Ventana adaptativa de enganche y seguimiento en el afinador
+
+**Decisión:** el filtrado de lecturas espurias del afinador deja de ser una ventana fija de aceptación y pasa a tener dos regímenes. `centsToTarget` conserva su ventana ancha de ±200 cents para **enganchar**, y `useTuner` agrega un **seguimiento** angosto de ±60 cents: con una estimación ya establecida, se descarta la lectura que se aleje más de eso, y si el rechazo persiste ocho lecturas se vuelve a enganchar. Por encima de ±200 no se descarta nada: ahí es otra cuerda, no un error.
+
+Acompañan tres cambios del mismo diagnóstico: mediana y EMA también en modo cuerda fija (compartiendo `smoothFrequency` con el automático, que ya los tenía), `FFT_SIZE` de 4096 a 8192, y un intervalo de detección de 50 ms que compensa el costo de que YIN sea O(lags²).
+
+**Razones:**
+La lectura saltaba entre "muy baja" y "afinada" sin que nadie tocara el instrumento, lo que hacía insostenible el umbral de afinado de ±5 cents que pedía el test de usabilidad. Se midió el detector contra señales sintéticas de frecuencia exacta conocida en vez de suponer la causa, y la hipótesis de trabajo —un sesgo del algoritmo hacia frecuencias bajas— resultó falsa: el error medio es de +0,7 cents, es decir ligeramente alto, y proviene íntegro de la inarmonicidad física de la cuerda real. La causa estaba en el código propio: el modo de cuerda fija usaba la lectura cruda de cada frame.
+
+La ventana adaptativa, en cambio, no salió de un diagnóstico sino de una medición que mostró que **ninguna ventana fija sirve**. Se probaron ±60, ±80, ±100, ±120 y ±200 sobre cuatro grados de desafinación. Las angostas aciertan con la cuerda casi afinada pero dejan **muda** la cuerda muy floja —a 150 cents del target no registra ninguna lectura—, que es justo cuando más se necesita el afinador; las anchas la detectan pero dejan pasar lecturas espurias de hasta 260 cents de error. Separar enganche de seguimiento es lo único que cubre los dos extremos, y se apoya en un hecho del dominio: girando una clavija el tono se mueve unos pocos cents entre lecturas consecutivas, nunca sesenta.
+
+**Por qué no basta con subir el buffer:** se midió 16384 y no corrige el caso problemático (una lectura ~66 cents alta en la cuerda Si con las vecinas sonando por simpatía). No es un problema de resolución sino de aceptación, y por eso la corrección va en la ventana y no en el tamaño del frame. El paso a 8192 se justifica por otra razón: `pitchfinder` descarta la mitad del buffer y usa la mitad de eso como lags, así que con 4096 quedaban apenas ~1,8 períodos de Mi grave para correlacionar.
+
+---
+
 ## 2026-08-16 — Desbloqueo del TTS por gesto del usuario
 
 **Decisión:** `lib/tts.ts` deja de asumir que `speechSynthesis.speak()` se ejecuta siempre. La locución se intenta y se **verifica**: si 250 ms después la síntesis quedó ociosa —no habla ni tiene nada encolado— y ningún `onstart` marcó que arrancó, se da por descartada y el texto se retiene como locución pendiente. Un listener global de `pointerdown`/`keydown`, registrado una sola vez, la emite al primer gesto. Solo se conserva la última pendiente: si hubo varios anuncios antes del gesto, el único vigente es el más reciente.

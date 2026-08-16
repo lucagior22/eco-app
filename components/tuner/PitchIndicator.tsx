@@ -2,7 +2,7 @@
 
 // Accesibilidad: el componente es puramente visual (aria-hidden).
 // La magnitud de la desviación llega al usuario que no ve por el canal único de audio
-// (incluida en `announcement` de useTuner: "Mi. Medianamente alto."), no por esta barra.
+// (incluida en `announcement` de useTuner: "Cuerda 6, Mi. Un poco baja. Tensá."), no por esta barra.
 
 import type { TuningStatus } from '@/hooks/useTuner'
 
@@ -14,12 +14,13 @@ interface PitchIndicatorProps {
 export default function PitchIndicator({ cents, status }: PitchIndicatorProps) {
   const clamped = Math.max(-50, Math.min(50, cents))
   const positionPct = ((clamped + 50) / 100) * 100
+  const isIdle = status === 'silent' || status === 'waiting'
 
   const dotColor =
     status === 'tuned' ? 'var(--color-success)' : 'var(--color-error)'
 
   const centsLabel =
-    status === 'silent'
+    isIdle
       ? ''
       : cents === 0
         ? '0'
@@ -32,7 +33,7 @@ export default function PitchIndicator({ cents, status }: PitchIndicatorProps) {
       <div className="relative h-10 w-full">
         <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 rounded-full bg-[var(--color-border)]" />
         <div className="absolute left-1/2 top-1/2 h-5 w-px -translate-x-1/2 -translate-y-1/2 bg-[var(--color-text-secondary)] opacity-50" />
-        {status !== 'silent' && (
+        {!isIdle && (
           <div
             className="absolute top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full transition-[left] duration-100"
             style={{
