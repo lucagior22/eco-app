@@ -1,24 +1,41 @@
 // Accesibilidad: las perillas detectadas se presentan en una <dl> semántica.
-// v2 no identifica modelo de pedal ni estado de LED (fuera de alcance) —
-// solo reporta la posición de cada perilla detectada genéricamente, expresada
-// como hora de reloj (1-12, jerga común entre músicos) en vez de porcentaje:
-// no requiere saber dónde está el "mínimo" o "máximo" de cada perilla.
+// El nombre de cada perilla es la etiqueta impresa en el pedal ("TONE", "LEVEL")
+// cuando el modelo la lee, y la posición en el panel ("Arriba izquierda") cuando
+// no: "Tone al medio" es más útil que "Arriba izquierda al medio" para quien no
+// ve el pedal.
 //
-// Una perilla con value null es una que el detector no pudo leer con acuerdo
-// entre las capturas. Se muestra igual, con texto explícito: omitirla haría
-// que el usuario contara mal las perillas del pedal, y darle un número
-// inventado sería peor todavía, porque no tiene cómo verificarlo.
+// La posición se expresa con una escala verbal de cinco escalones —la misma idea
+// que usa /afinador— y la hora de reloj queda como detalle secundario: un error
+// de 15° cambia la hora pero rara vez el escalón.
+//
+// Una perilla con value null es una que el modelo no leyó con confianza. Se
+// muestra igual, con texto explícito: omitirla haría que el usuario contara mal
+// las perillas del pedal, y darle un número inventado sería peor todavía,
+// porque no tiene cómo verificarlo.
 
-import { clockHourToSpanish } from '@/lib/clock'
+import { clockHourToSpanish, clockHourToScale } from '@/lib/clock'
 
 export interface Knob {
   label: string
+  printedLabel: string | null
   value: number | null
-  agreement: number
+  confidence: 'alta' | 'baja'
 }
 
 interface PedalInfoProps {
   knobs: Knob[]
+}
+
+/** Nombre visible y hablado de la perilla: etiqueta impresa si se leyó, si no la posición. */
+export function knobName(knob: Knob): string {
+  return knob.printedLabel ?? knob.label
+}
+
+/** Texto de la lectura: escala verbal y, entre paréntesis, la hora de reloj. */
+export function knobReading(hour: number): string {
+  const scale = clockHourToScale(hour)
+  const clock = `a ${clockHourToSpanish(hour)}`
+  return scale ? `${scale} (${clock})` : clock
 }
 
 export default function PedalInfo({ knobs }: PedalInfoProps) {
@@ -39,16 +56,16 @@ export default function PedalInfo({ knobs }: PedalInfoProps) {
       )}
 
       <dl className="grid grid-cols-2 gap-4">
-        {knobs.map(({ label, value }) => (
-          <div key={label}>
-            <dt className="text-sm text-[var(--color-text-secondary)]">{label}</dt>
-            {value === null ? (
+        {knobs.map((knob) => (
+          <div key={`${knob.label}-${knob.printedLabel ?? ''}`}>
+            <dt className="text-sm text-[var(--color-text-secondary)]">{knobName(knob)}</dt>
+            {knob.value === null ? (
               <dd className="text-lg font-bold text-[var(--color-text-secondary)]">
                 Sin lectura confiable
               </dd>
             ) : (
-              <dd className="text-2xl font-bold text-[var(--color-text-primary)] capitalize">
-                {clockHourToSpanish(value)}
+              <dd className="text-2xl font-bold text-[var(--color-text-primary)]">
+                {knobReading(knob.value)}
               </dd>
             )}
           </div>

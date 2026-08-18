@@ -99,6 +99,7 @@ Librería: usá **React Aria** para componentes interactivos complejos. No const
 | Pitch detection | `pitchfinder` (client-side, Web Audio API)          |
 | TTS             | Web Speech API nativo                               |
 | OCR             | `/api/ocr` route → `child_process` → Tesseract       |
+| Visión (perillas) | `/api/pedal/detect` → `@google/genai` → Gemini      |
 | Estado global   | React Context (sin Redux, sin Zustand)              |
 | Persistencia    | `localStorage` para preferencias                    |
 
@@ -248,6 +249,6 @@ docker-compose up
 | `/afinador`            | Afinador       | Mic → pitch → TTS              |
 | `/partitura`           | Leer partitura | Foto/archivo → OCR → acordes   |
 | `/metronomo`           | Metrónomo      | BPM + audio/háptico            |
-| `/pedal`               | Detectar pedal | Cámara → mock detección → info |
+| `/pedal`               | Detectar pedal | Cámara → Gemini (visión) → perillas |
 | `/ajustes`             | Ajustes        | Tema, fuente, velocidad TTS    |
 | `/informacion`         | Información    | Explicación de cada módulo + FAQ (fuera de la barra de nav) |

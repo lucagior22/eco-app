@@ -12,20 +12,18 @@
 import { useEffect, useRef } from 'react'
 import { useCamera } from '@/hooks/useCamera'
 
-export type DetectStatus = 'idle' | 'capturing' | 'loading' | 'done' | 'error'
+export type DetectStatus = 'idle' | 'loading' | 'done' | 'error'
 
-// Se toma una ráfaga en vez de una sola foto porque el detector vota entre las
-// capturas para descartar lecturas inconsistentes. Van separadas en el tiempo a
-// propósito: cuadros consecutivos del stream son casi idénticos y votar entre
-// ellos no aportaría nada — es el micromovimiento natural de la mano entre una
-// toma y la siguiente lo que da puntos de vista distintos de la misma perilla.
-const BURST_FRAMES = 5
-const BURST_INTERVAL_MS = 400
+// Se manda UNA sola foto. La rafaga de varias capturas existia para que el
+// modelo contrastara entre ellas y bajara la confianza al leer distinto, pero
+// medido no lo hace: funde las fotos y responde con confianza alta igual. Tres
+// fotos costaban 3.288 tokens de entrada contra 1.110 de una sola — el triple,
+// sin ganancia observable. Ver claude-docs/PEDAL.md.
 
 interface CameraViewProps {
   status: DetectStatus
-  onCapture: (files: File[]) => void
-  onBurstStart?: () => void
+  onCapture: (file: File | null) => void
+  onCaptureStart?: () => void
   onReady?: (torchSupported: boolean) => void
   onError?: (message: string) => void
 }
@@ -33,7 +31,7 @@ interface CameraViewProps {
 export default function CameraView({
   status,
   onCapture,
-  onBurstStart,
+  onCaptureStart,
   onReady,
   onError,
 }: CameraViewProps) {
@@ -64,9 +62,7 @@ export default function CameraView({
     return new Promise((resolve) => {
       canvas.toBlob(
         (blob) => {
-          resolve(
-            blob ? new File([blob], `pedal_${Date.now()}.jpg`, { type: 'image/jpeg' }) : null
-          )
+          resolve(blob ? new File([blob], `pedal_${Date.now()}.jpg`, { type: 'image/jpeg' }) : null)
         },
         'image/jpeg',
         0.92
@@ -74,17 +70,9 @@ export default function CameraView({
     })
   }
 
-  async function captureBurst() {
-    onBurstStart?.()
-    const files: File[] = []
-
-    for (let i = 0; i < BURST_FRAMES; i++) {
-      if (i > 0) await new Promise((r) => setTimeout(r, BURST_INTERVAL_MS))
-      const file = await grabFrame()
-      if (file) files.push(file)
-    }
-
-    onCapture(files)
+  async function capture() {
+    onCaptureStart?.()
+    onCapture(await grabFrame())
   }
 
   // Sin role="alert": el texto ya viaja por el canal único del padre (onError).
@@ -100,7 +88,7 @@ export default function CameraView({
   }
 
   const detected = status === 'done'
-  const busy = status === 'capturing' || status === 'loading'
+  const busy = status === 'loading'
 
   return (
     <div className="flex flex-col gap-4">
@@ -119,10 +107,7 @@ export default function CameraView({
         />
 
         {!isActive && (
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 flex items-center justify-center"
-          >
+          <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center">
             <p className="text-sm text-white">Iniciando cámara...</p>
           </div>
         )}
@@ -144,27 +129,19 @@ export default function CameraView({
       <button
         ref={buttonRef}
         type="button"
-        onClick={captureBurst}
+        onClick={capture}
         disabled={!isActive || busy}
         aria-busy={busy}
         aria-label={
-          status === 'capturing'
-            ? 'Tomando fotos del pedal, mantené la cámara apuntando'
-            : status === 'loading'
-              ? 'Analizando perillas del pedal'
-              : detected
-                ? 'Detectar pedal de nuevo con la cámara'
-                : 'Detectar pedal con la cámara'
+          status === 'loading'
+            ? 'Analizando perillas del pedal'
+            : detected
+              ? 'Detectar pedal de nuevo con la cámara'
+              : 'Detectar pedal con la cámara'
         }
         className="w-full rounded-lg bg-[var(--color-accent)] px-6 py-3 font-semibold text-white focus:outline-2 focus:outline-offset-2 focus:outline-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {status === 'capturing'
-          ? 'Tomando fotos…'
-          : status === 'loading'
-            ? 'Analizando…'
-            : detected
-              ? 'Detectar de nuevo'
-              : 'Detectar pedal'}
+        {status === 'loading' ? 'Analizando…' : detected ? 'Detectar de nuevo' : 'Detectar pedal'}
       </button>
     </div>
   )

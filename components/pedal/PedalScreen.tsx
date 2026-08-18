@@ -13,13 +13,11 @@
 
 import { useCallback, useState } from 'react'
 import CameraView, { type DetectStatus } from '@/components/pedal/CameraView'
-import PedalInfo, { type Knob } from '@/components/pedal/PedalInfo'
+import PedalInfo, { knobName, knobReading, type Knob } from '@/components/pedal/PedalInfo'
 import LiveRegion from '@/components/a11y/LiveRegion'
 import { useAnnouncer } from '@/hooks/useAnnouncer'
-import { clockHourToSpanish } from '@/lib/clock'
 
-const TTS_READY =
-  'Cámara lista. Presioná el botón Detectar pedal para identificar las perillas.'
+const TTS_READY = 'Cámara lista. Presioná el botón Detectar pedal para identificar las perillas.'
 const TTS_READY_WITH_TORCH =
   'Cámara lista. Si hay poca luz, presioná el botón Encender flash para mejorar la detección. Presioná el botón Detectar pedal para identificar las perillas.'
 
@@ -28,8 +26,8 @@ const TTS_READY_WITH_TORCH =
 function buildResultSpeech(knobs: Knob[]): string {
   const parts = knobs.map((k) =>
     k.value === null
-      ? `${k.label}, no pude leerla con confianza`
-      : `${k.label} a ${clockHourToSpanish(k.value)}`
+      ? `${knobName(k)}, no pude leerla con confianza`
+      : `${knobName(k)} ${knobReading(k.value)}`
   )
   const unread = knobs.filter((k) => k.value === null).length
   const retry =
@@ -52,14 +50,16 @@ export default function PedalScreen() {
     [announce]
   )
 
-  const handleBurstStart = useCallback(() => {
-    setStatus('capturing')
-    announce('Tomando fotos. Mantené la cámara apuntando al pedal.')
+  const handleCaptureStart = useCallback(() => {
+    setStatus('loading')
+    // El análisis es una llamada de red de varios segundos: se avisa desde el
+    // arranque para que el silencio no se lea como que no pasó nada.
+    announce('Foto tomada. Analizando el pedal, esto tarda unos segundos.')
   }, [announce])
 
   const handleCapture = useCallback(
-    async (files: File[]) => {
-      if (files.length === 0) {
+    async (file: File | null) => {
+      if (!file) {
         const msg = 'No se pudo capturar la imagen de la cámara.'
         setStatus('error')
         setErrorMessage(msg)
@@ -67,11 +67,10 @@ export default function PedalScreen() {
         return
       }
 
-      setStatus('loading')
       setErrorMessage(null)
 
       const formData = new FormData()
-      files.forEach((file) => formData.append('image', file))
+      formData.append('image', file)
 
       try {
         const res = await fetch('/api/pedal/detect', { method: 'POST', body: formData })
@@ -112,7 +111,7 @@ export default function PedalScreen() {
       <CameraView
         status={status}
         onCapture={handleCapture}
-        onBurstStart={handleBurstStart}
+        onCaptureStart={handleCaptureStart}
         onReady={handleReady}
         onError={handleCameraError}
       />

@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """Detección genérica de perillas en fotos de un pedal de efectos.
 
+SIN USO desde el 2026-08-18: /api/pedal/detect ya no invoca este script — la
+lectura de perillas la hace un modelo multimodal (Gemini). El archivo se
+conserva a propósito como evidencia del proceso de diagnóstico documentado en
+INFORME.md §2.3 y claude-docs/PEDAL.md (tres defectos encontrados y medidos
+sobre 92 fotos reales). Sus dependencias (opencv-python-headless, numpy) ya no
+se instalan en la imagen Docker, así que no corre dentro del contenedor.
+
 No identifica marca ni modelo de pedal: solo ubica círculos (perillas) y
 estima hacia qué hora del reloj apunta la marca de cada una (1-12), igual
 que se describe una perilla en la jerga de músicos ("está a las 3"). No

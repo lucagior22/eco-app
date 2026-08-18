@@ -1,33 +1,20 @@
 # Imagen base: Debian Bookworm slim con Node 20 LTS.
-# Se descarta Alpine porque opencv-python-headless (detección de perillas en
-# /pedal) se distribuye en PyPI como wheels manylinux (glibc). En Alpine (musl)
-# pip no puede instalarlos y tendría que compilar OpenCV desde fuente.
-# Debian tiene glibc → los wheels manylinux instalan sin problema.
+# Se mantiene Debian y no Alpine por compatibilidad de los paquetes de sistema
+# (tesseract, poppler) y para no cambiar una base ya validada. La razón original
+# —los wheels manylinux de opencv-python-headless— dejó de aplicar cuando
+# /pedal pasó a resolverse con un modelo multimodal (ver DECISIONS.md).
 FROM node:20-bookworm-slim
 
 # Dependencias de sistema:
-#   python3 / pip3     → runtime e instalador de scripts/detect_knobs.py
 #   tesseract-ocr      → OCR del cifrado de acordes en /api/ocr
 #   poppler-utils      → pdftoppm, convierte partituras en PDF a imagen
-#   libglib2.0-0       → requerida por opencv-python-headless al importar cv2
-#   libgomp1           → OpenMP, requerida por OpenCV en CPU
-# Se instala en un solo RUN para reducir capas y limpiar la caché de apt.
+# Ya no se instalan python3, opencv-python-headless ni numpy: el detector de
+# perillas por visión clásica (scripts/detect_knobs.py) quedó en el repo como
+# evidencia del proceso, pero la app no lo invoca y no necesita correrlo.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    python3-pip \
     tesseract-ocr \
     poppler-utils \
-    libglib2.0-0 \
-    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
-
-# opencv-python-headless y numpy: usados por scripts/detect_knobs.py (detección
-# de perillas de pedal, ver /api/pedal/detect). Antes llegaban transitivamente
-# como dependencias de oemer; al removerse oemer, esta línea es la única que
-# las instala — de ahí que ya estuvieran declaradas explícitas.
-# --break-system-packages es necesario en Debian Bookworm porque Python 3.11+
-# marca el entorno como "externally managed" por defecto (PEP 668).
-RUN pip3 install --no-cache-dir --break-system-packages opencv-python-headless numpy
 
 WORKDIR /app
 
@@ -39,4 +26,8 @@ RUN npm run build
 
 EXPOSE 3000
 
+# Variables de entorno esperadas en runtime (nunca hardcodeadas en la imagen):
+#   GEMINI_API_KEY  → detección de perillas en /pedal. Sin ella, esa pantalla
+#                     responde con un mensaje narrado y el resto sigue andando.
+#   GEMINI_MODEL    → opcional, modelo multimodal a usar.
 CMD ["npm", "start"]

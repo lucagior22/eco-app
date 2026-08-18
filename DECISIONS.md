@@ -8,6 +8,59 @@ el código se reemplaza `Pendiente` por la fecha y se elimina la línea de estad
 
 ---
 
+## 2026-08-18 — Hosting en Vercel (reemplaza a Railway) y el `Dockerfile` deja de usarse en producción
+
+**Decisión:** la app se hostea en **Vercel**, que construye el proyecto Next.js de forma nativa. Reemplaza a Railway como entorno de hosting principal (ver entrada del 2026-06-30). El `Dockerfile` y el `docker-compose.yml` se conservan para desarrollo y para autohospedaje, pero **no participan del deploy de producción**.
+
+**Razones:**
+Railway dejó de ser viable por agotamiento de los créditos del plan gratuito de la cuenta que hospedaba el proyecto. Vercel es el entorno natural de una app Next.js: detecta el framework sin configuración, provee HTTPS y dominio público, y su plan gratuito alcanza para un proyecto académico. Se descartó volver al esquema autohospedado (Docker sobre servidor local + Cloudflare Tunnel, entrada del 2026-06-01) porque exige mantener una máquina encendida.
+
+**La consecuencia que importa: Vercel ignora el `Dockerfile`.** Todo lo que ese archivo instala —binarios de sistema invocados por `child_process`— no existe en producción. Esto vuelve retroactivamente visible un problema que el deploy de Railway ocultaba:
+
+- **`/pedal` no podía funcionar en producción con el detector OpenCV.** Dependía de `python3` y `opencv-python-headless`, ausentes en Vercel. La migración a Gemini (entrada siguiente) no solo mejora la precisión: es lo que hace que la pantalla exista en el deploy, porque una llamada de red desde una route de Next.js es precisamente lo que Vercel corre bien.
+- **`/api/ocr` está roto en producción por la misma causa.** Hace `execFile('tesseract', ...)` y ese binario no está en Vercel, así que `/partitura` falla en el deploy aunque funcione en desarrollo. Queda registrado como problema abierto: la solución probablemente sea análoga a la de `/pedal` (resolver el OCR con un servicio en vez de un binario local), pero no se abordó en esta iteración.
+
+La lección de arquitectura es que **la elección de plataforma de deploy determina qué técnicas de implementación son viables**, y que invocar binarios del sistema vía `child_process` —cómodo en un contenedor propio— es una dependencia de infraestructura que no sobrevive a un cambio de hosting.
+
+**Variables de entorno en producción:** `GEMINI_API_KEY` se carga en el panel de Vercel (Settings → Environment Variables), marcada en Production y Preview. Nunca con prefijo `NEXT_PUBLIC_`, que la expondría en el bundle del cliente. La variable se aplica recién en el deploy siguiente a su creación.
+
+---
+
+## 2026-08-18 — `/pedal` pasa a un modelo multimodal (Gemini) y deja de procesarse localmente
+
+**Decisión:** la detección de perillas deja de hacerse con visión clásica (`scripts/detect_knobs.py`: HoughCircles + contraste angular + votación entre capturas) y pasa a resolverse con **Gemini**, llamado desde `/api/pedal/detect` con el SDK `@google/genai`. El script de OpenCV queda en el repo como evidencia del proceso pero ya no se invoca, y Python/OpenCV/numpy salen del `Dockerfile`. La respuesta suma la **etiqueta impresa** de cada perilla y la posición pasa a expresarse con una **escala verbal de cinco escalones**, con la hora de reloj como detalle secundario.
+
+**Razones:**
+
+**El detector clásico no era usable.** El techo medido sobre las 92 fotos reales era ~68 % de consistencia por foto, y las limitaciones restantes eran estructurales y no de calibración (ver la entrada del 2026-07-28 y `claude-docs/PEDAL.md`): sesgo sistemático por perspectiva que la votación no corrige, umbrales calibrados contra un único modelo de pedal, y una cuantización a 12 horas donde 15° de error cambian la respuesta. Tres rondas de arreglos medidos movieron la consistencia del 59 % al 67 %: retorno decreciente sobre un piso que igual no alcanza. En uso real la pantalla se comportaba de forma inconsistente incluso con encuadre y luz buenos.
+
+**Por qué Gemini y no la API de Claude.** `claude-docs/PROPUESTA-DETECCION-PEDAL.md` había recomendado la API de Claude con visión (~USD 0,02–0,08 por detección). Gemini ofrece un tier gratuito para el volumen de este proyecto —una acción puntual, no continua— y es el mismo diseño con otro proveedor: la arquitectura de la propuesta se mantiene tal cual. Para un TFI sin presupuesto operativo, el costo cero decide.
+
+**Qué se gana además de precisión.** Un modelo multimodal lee la **serigrafía del panel**, cosa que el pipeline OpenCV nunca podría: "Tone al medio" es estrictamente más útil para quien no ve el pedal que "Arriba izquierda a las tres". Y desaparece la fragilidad ante perillas claras, marcas grabadas o layouts distintos del pedal de prueba.
+
+**Escala verbal de cinco escalones.** La medición previa mostró que con tolerancia de ±1 hora la consistencia saltaba del 67 % al 85 %: buena parte del error era de exactamente una hora. Reportar "al medio" en vez de "a las doce" absorbe ese error —cinco escalones sobre los ~300° de recorrido de una perilla toleran ~30° cada uno— y además es como se describe una perilla hablando. Es el mismo criterio que `/afinador` ya usa para la desviación. La hora se conserva entre paréntesis: quien la quiera precisa la tiene, y no se pierde la jerga de músicos que motivó elegirla en la v2.
+
+**La abstención explícita se mantiene, y ahora es más necesaria.** El modelo devuelve un campo `confidence`; si viene `"baja"`, la route fuerza `value: null` y la UI dice "no pude leerla con confianza", igual que antes. El detector clásico al menos se abstenía por falta de acuerdo entre capturas: un LLM, ante una foto borrosa, inventa un número con total aplomo si no se lo instruye explícitamente en contra. El prompt es explícito sobre que el usuario no puede verificar visualmente el resultado, y se mandan 3 capturas para que el propio modelo contraste entre ellas y baje su confianza cuando no coinciden.
+
+**De 5 capturas a una sola.** La redundancia existía para compensar un detector inestable mediante votación. Al migrar se bajó primero a 3, esperando que el modelo contrastara entre tomas y bajara su confianza al leer distinto. Medido, no lo hace: funde las fotos y responde con confianza alta igual. Como el costo sí es real —3.288 tokens de entrada con 3 fotos contra 1.110 con una, con idéntica detección y latencia— se pasó a **una sola foto**. Deja de pagarse el triple de cuota por una redundancia que no compra nada; el problema de la confianza queda abierto y se ataca por otro lado.
+
+**Lo que esta decisión cuesta, explícitamente:**
+
+- **Se rompe el procesamiento local.** Las fotos del pedal salen del dispositivo hacia Google. En el tier gratuito de Gemini, Google puede usar los prompts y las respuestas para mejorar sus modelos. Es riesgo bajo para una foto de un pedal, pero es un hecho que la app tiene que declarar: se documenta en `README.md`, se dice en `/informacion` y se registra acá. Afinador y metrónomo —lo crítico en vivo— siguen 100 % locales.
+- **Dependencia de red y de un tercero.** Sin internet la pantalla no funciona; responde con un mensaje narrado específico en vez de un error crudo. Se distinguen tres fallos con mensajes propios: sin clave configurada, límite de cuota alcanzado, y sin conexión.
+- **No determinismo.** La misma foto puede dar respuestas distintas entre corridas. Se mitiga con `temperature: 0`, sin garantizarlo.
+- **Modelos que rotan.** Los modelos del tier gratuito se deprecian. El identificador vive en la variable de entorno `GEMINI_MODEL` (default `gemini-2.5-flash`) justo para que eso no obligue a tocar código.
+
+**Por qué el script de OpenCV queda en el repo.** Es la evidencia del proceso de diagnóstico documentado en `PEDAL.md` e `INFORME.md` §2.3: tres defectos concretos encontrados y medidos sobre datos propios. Queda como dead code declarado, no invocado por nadie y sin sus dependencias en la imagen Docker. Es una excepción consciente a la regla de no dejar código muerto, por su valor como material académico.
+
+**Primera medición (2026-08-18, sobre una foto):** la detección de perillas y la lectura de etiquetas impresas funcionan bien —4 de 4 perillas, etiquetas y posiciones correctas, 3,5 s de punta a punta—. El ángulo acierta 1 de 4. Y aparece un problema que invalida el mecanismo de abstención: **el modelo devuelve `confidence: "alta"` en todas las perillas**, incluida una que erraba por 3 horas, así que la UI nunca dice "no pude leerla con confianza". Queda como el problema abierto principal; ver `claude-docs/PEDAL.md`.
+
+**Nota operativa:** el default original `gemini-2.5-flash` dejó de estar disponible y devolvía 404. Se pasó a `gemini-3.5-flash-lite`, que ademas es ~10x más rápido que los flash grandes sin peor acierto angular. Esto confirma en la práctica el riesgo de rotación de modelos anticipado más abajo.
+
+**Pendiente de validación:** la precisión de la lectura de ángulo con Gemini **no está medida todavía** de forma sistemática. Leer hacia dónde apunta una marca es una debilidad conocida de los modelos de visión —el mismo problema que leer un reloj analógico—, así que la mejora sobre el 68 % es una expectativa razonable y no un hecho verificado. El criterio de éxito propuesto está en `PROPUESTA-DETECCION-PEDAL.md` y hay 92 fotos reales en `tmp/debug_captures/` para medirlo.
+
+---
+
 ## 2026-08-16 — Resolución de captura y presentación aproximada en `/partitura`
 
 **Decisión:** la cámara de `ScoreUpload` pide `width`/`height: { ideal: 1920 }`, la espera del OCR pasa a tener feedback sostenido (recordatorio a los 10 s y corte del cliente a los 35 s), y el resultado se narra solo, enunciado siempre como lectura aproximada.

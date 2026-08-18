@@ -1,14 +1,144 @@
 # Detección de perillas — `/pedal` y `/api/pedal/detect`
 
-Funcionamiento técnico y, sobre todo, los límites medidos de la detección. Complementa las entradas de `DECISIONS.md`.
+Funcionamiento técnico de la detección y, sobre todo, sus límites. Complementa las entradas de `DECISIONS.md`.
+
+**Estado:** desde el 2026-08-18 la detección la hace **Gemini** (modelo multimodal), no el detector OpenCV. El apéndice al final conserva el detector anterior y sus mediciones, porque son la evidencia que justificó el cambio.
 
 ---
 
 ## Qué hace y qué no
 
-No identifica marca ni modelo de pedal. Ubica círculos oscuros (perillas) y estima hacia qué hora del reloj apunta la marca de cada una, que es como un músico describe la posición de una perilla ("está a las 3"). Esa elección evita tener que saber dónde está el 0% y el 100% de cada perilla, que varía según el modelo.
+Identifica las perillas (potenciómetros giratorios) de un pedal de efectos en una foto y, para cada una, informa:
+
+- **La etiqueta impresa** en el panel cuando se lee ("TONE", "LEVEL", "SUB"). Es lo más útil para quien no ve el pedal, y algo que el detector anterior no podía dar.
+- **La posición**, en una escala verbal de cinco escalones (al mínimo / bajo / al medio / alto / al máximo), con la hora de reloj entre paréntesis.
+- **La confianza**: si el modelo no está seguro, la perilla se reporta como "sin lectura confiable" en vez de arriesgar un número.
+
+No identifica marca ni modelo de pedal, y no lee el estado del LED.
 
 ---
+
+## Pipeline
+
+```
+Cliente (CameraView)
+  └─ una captura del stream
+       └─ POST /api/pedal/detect (multipart, clave "image")
+            └─ @google/genai → GEMINI_MODEL (default gemini-3.5-flash-lite)
+                 ├─ la foto como inlineData base64 + prompt en español
+                 ├─ temperature 0, responseSchema (JSON estructurado garantizado)
+                 └─ por perilla: position, printedLabel, clockHour, confidence
+            └─ normalize(): confidence "baja" o hora inválida → value: null
+            └─ NextResponse.json({ knobs, framesUsed })
+  └─ PedalInfo + narración TTS
+```
+
+---
+
+## Decisiones de diseño
+
+### Por qué hora de reloj y no porcentaje
+
+No requiere saber dónde está el 0 % y el 100 % de cada perilla, que varía según el modelo de pedal. Es además la jerga con la que un músico describe una perilla ("está a las 3").
+
+### Por qué encima una escala verbal de cinco escalones
+
+La cuantización a 12 horas es demasiado fina para lo que cualquier sistema de visión puede sostener: un error de 15° cambia la hora reportada. La medición del detector anterior lo mostró con números — con tolerancia de ±1 hora la consistencia saltaba del 67 % al 85 %, es decir que buena parte del error era de exactamente una hora.
+
+El recorrido de una perilla de pedal no es la vuelta completa: va de las 7 (mínimo) a las 5 (máximo) pasando por las 12, unos 300°. Cinco escalones sobre ese recorrido toleran ~30° cada uno: el doble del error que cambiaba la hora. La conversión está en `clockHourToScale` (`lib/clock.ts`); las 6 devuelven `null` porque quedan fuera del recorrido, y en ese caso se reporta solo la hora.
+
+La hora no se descarta: se muestra entre paréntesis y quien la quiera precisa la tiene.
+
+### Por qué una sola foto
+
+El detector OpenCV mandaba 5 capturas y votaba entre ellas. Al migrar a Gemini se bajó a 3 con la idea de que el modelo contrastara entre tomas y bajara la confianza al leer distinto. **Medido, no lo hace**: funde las fotos y responde `confidence: "alta"` igual.
+
+El costo de esa redundancia sí es real y está medido: 3.288 tokens de entrada con 3 fotos contra 1.110 con una — el triple de cuota consumida por detección, con la misma cantidad de perillas detectadas, las mismas etiquetas y la misma latencia (~3 s). Se bajó a una sola foto.
+
+Esto no cierra el problema de la confianza, solo deja de pagar por una solución que no funcionaba. El camino para recuperar la abstención sigue abierto y está descrito abajo.
+
+### Por qué la abstención es más importante que antes, no menos
+
+El detector clásico se abstenía por construcción: si las capturas no coincidían, no había moda que reportar. Un modelo de lenguaje **no se abstiene solo**: ante una foto borrosa produce un número con total aplomo. Por eso:
+
+- El schema tiene un campo `confidence` obligatorio con valores `"alta"` / `"baja"`.
+- El prompt dice explícitamente que el usuario no puede ver la pantalla ni verificar la respuesta, y que una lectura equivocada dicha con seguridad es peor que admitir que no se pudo leer.
+- `normalize()` en la route **fuerza `value: null`** cuando la confianza es baja o la hora está fuera de 1-12. La UI y el TTS no ven la diferencia entre "el modelo no supo" y "el modelo dudó": las dos son "no pude leerla con confianza".
+
+Para un usuario que no ve, esto no es un detalle. Quien ve descarta una lectura absurda de un vistazo; quien no ve, no tiene cómo.
+
+### Identidad estable de las perillas
+
+El nombre de una perilla es su etiqueta impresa cuando se lee, y su posición en el panel ("Arriba izquierda") cuando no. Nunca un índice: "Perilla 2" pasa a referirse a otra perilla física según cuántas se detecten, y el usuario que no ve no tiene forma de notarlo. Solo se cae a "Perilla N" cuando el layout no encaja en ninguna posición nombrable — menos útil, pero nunca ambiguo dentro de una misma respuesta.
+
+---
+
+## Manejo de errores
+
+Cada fallo tiene un mensaje propio, narrado por el canal único de `PedalScreen`. Un "error 429" no le dice nada al usuario sobre qué hacer:
+
+| Situación | Respuesta |
+| --- | --- |
+| Sin `GEMINI_API_KEY` en el servidor | 503 — "La detección de pedal necesita conexión a internet y no está configurada en este servidor." |
+| Cuota agotada (429 / `RESOURCE_EXHAUSTED`) | 500 — "Se alcanzó el límite de uso del servicio de detección. Probá de nuevo en unos minutos." |
+| Clave inválida (401 / 403) | 500 — "El servicio de detección no está configurado correctamente en el servidor." |
+| Sin conexión o timeout (30 s) | 500 — "No se pudo conectar con el servicio de detección. Verificá tu conexión a internet." |
+| No se detectó ninguna perilla | 500 — mensaje sobre encuadre, distancia e iluminación |
+
+El resto de la app funciona normalmente sin la clave: solo `/pedal` queda sin servicio.
+
+---
+
+## Configuración
+
+| Variable | Default | Rol |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | — | Clave del servidor. Se obtiene gratis en aistudio.google.com/apikey. **Nunca** con prefijo `NEXT_PUBLIC_`. |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Modelo multimodal. Es variable porque los modelos del tier gratuito rotan y se deprecian: `gemini-2.5-flash`, el default original, dejó de estar disponible y devolvía 404. |
+
+En la route, `MAX_IMAGES` (3, tope defensivo: el cliente manda una) y `TIMEOUT_MS` (30 s).
+
+**Consumo por detección:** 1 request, ~1.110 tokens de entrada y ~186 de salida. Reescalar la imagen antes de mandarla **no reduce tokens** —Gemini la normaliza, 633 KB y 215 KB cuestan igual—; solo bajaría el ancho de banda de subida.
+
+### Por qué la variante "lite"
+
+Medido sobre una foto real del pedal, misma request y mismo schema:
+
+| Modelo | Latencia | Perillas detectadas |
+| --- | --- | --- |
+| `gemini-3.7-flash` | 44,3 s | 4 |
+| `gemini-3.6-flash` | 27,5 s | 4 |
+| **`gemini-3.5-flash-lite`** | **3,7 s** | 4 |
+| `gemini-3.1-flash-lite` | 7,0 s | 4 |
+
+Los cuatro encuentran las 4 perillas y leen bien las etiquetas impresas. El acierto en el ángulo no mejora con los modelos grandes: el razonamiento extra no compra precisión angular. Para un usuario que espera escuchando, 4 segundos y 45 segundos no son lo mismo, y 44 s además excedía el `TIMEOUT_MS` de la route.
+
+### Primer resultado medido, y el problema que expone
+
+Sobre la única foto con ground truth cargado, la ráfaga completa de 3 capturas responde en **3,5 s**, detecta las **4 perillas** con sus etiquetas y posiciones correctas, y acierta **1 de 4 horas** — pero devuelve `confidence: "alta"` en las cuatro, incluida una que erraba por 3 horas.
+
+Ese es el hallazgo importante, y no depende de cuán confiable sea el ground truth de una sola foto: **el modelo no usa el campo de confianza**. Todo el diseño de abstención descansa en que marque `"baja"` cuando duda, y en la práctica no lo hace. Con la instrumentación actual, la UI nunca va a decir "no pude leerla con confianza", que era precisamente la garantía que la hacía usable para alguien que no puede verificar.
+
+Corregirlo exige atacar la calibración de la confianza, no el prompt de lectura: pedir una lectura por foto y marcar `"baja"` cuando difieran entre capturas, o pedir un rango en vez de un valor. Está sin resolver.
+
+---
+
+## Limitaciones abiertas
+
+- **La precisión de ángulo no está medida.** Es la limitación más importante y es honesta: leer hacia dónde apunta una marca es una debilidad conocida de los modelos de visión (el mismo problema que leer un reloj analógico). La expectativa razonable es superar con comodidad el 68 % del detector anterior y sumar las etiquetas; el hecho verificado, todavía no existe. Hay 92 fotos reales en `tmp/debug_captures/` y un criterio de éxito propuesto en `PROPUESTA-DETECCION-PEDAL.md` para medirlo.
+- **Las fotos salen del dispositivo.** Van a la API de Gemini. En el tier gratuito Google puede usarlas para mejorar sus modelos. La app lo declara en el README y en `/informacion`.
+- **Sin internet no hay detección.** Con mensaje narrado, no con un error crudo. Afinador y metrónomo siguen 100 % locales.
+- **No es determinista.** `temperature: 0` reduce la variación pero no la elimina, y el modelo puede cambiar por debajo sin aviso. Para reproducir una medición hay que anotar el identificador exacto del modelo.
+- **Cuotas del tier gratuito.** Un test de usabilidad con varias personas seguidas puede agotarlas. El mensaje de cuota está previsto, pero la pantalla queda sin servicio hasta que se renueve.
+- **Latencia mayor que antes.** ~1,2 s de ráfaga + varios segundos de red y análisis, contra los ~1,6 s totales del detector local. La espera se narra desde el arranque.
+
+---
+
+---
+
+# Apéndice — el detector OpenCV anterior (v2/v3, hasta 2026-08-18)
+
+Se conserva porque las mediciones de abajo son la evidencia que justificó abandonarlo, y porque `INFORME.md` §2.3 las cita. El script sigue en `scripts/detect_knobs.py` como material de proceso: **no lo invoca nadie**, y sus dependencias (Python, OpenCV, numpy) ya no están en la imagen Docker.
 
 ## Pipeline
 

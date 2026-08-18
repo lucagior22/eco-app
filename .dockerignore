@@ -2,3 +2,10 @@ node_modules
 .next
 .git
 tmp
+
+# Archivos de entorno: NUNCA deben entrar a la imagen. `COPY . .` los copiaría
+# y la clave quedaría horneada en una capa, legible por cualquiera que tenga la
+# imagen. Las variables se inyectan en runtime (docker-compose.yml las pasa
+# desde el entorno del host).
+.env
+.env.*

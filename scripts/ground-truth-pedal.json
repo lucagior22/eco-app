@@ -1,0 +1,299 @@
+{
+  "_comentario": "Ground truth manual para EVALUAR la lectura de perillas de /pedal. No se le manda a Gemini como contexto: es la vara contra la que se compara lo que Gemini responde. Completar a mano, mirando cada foto.",
+  "pedal": "TC Electronic Sub'n'Up",
+  "carpetaFotos": "tmp/etiquetar/  (copias de tmp/debug_captures/ renombradas con prefijo NN_ en el mismo orden que este archivo)",
+  "hojaDeContacto": "tmp/hoja-de-contacto.jpg",
+  "_nota_fotos": "Las fotos no estan versionadas (tmp/ esta en .gitignore). Este archivo si, porque el trabajo de etiquetado es el activo, no las imagenes.",
+  "_plantillaPerilla": {
+    "posicion": "Arriba izquierda | Arriba centro | Arriba derecha | Abajo izquierda | Abajo centro | Abajo derecha | Izquierda | Centro | Derecha | Perilla N",
+    "etiquetaImpresa": "texto impreso en el panel, o null si no se lee",
+    "horaReloj": "entero 1-12, o null si no se puede determinar"
+  },
+  "comoCompletar": [
+    "Por cada foto, agregar un objeto a 'perillas' por cada perilla que veas, copiando la forma de '_plantillaPerilla'.",
+    "Ordenar las perillas de arriba a abajo y, dentro de cada fila, de izquierda a derecha.",
+    "Incluir SOLO perillas giratorias: no footswitches, jacks, tornillos, LEDs ni interruptores de palanca.",
+    "Usar 'nota' para lo que no entra en los campos: encuadre raro, reflejo, foto lejana, o por que dejaste algo en null."
+  ],
+  "convenciones": {
+    "horaReloj": "Entero 1-12. Hacia donde apunta la marca indicadora de la perilla. 12 = arriba, 3 = derecha, 6 = abajo, 9 = izquierda.",
+    "orientacion": "IMPORTANTE: la hora se lee respecto del PEDAL, no de la foto. Si el pedal aparece rotado o en diagonal, tomar como 'arriba' el lado donde el texto del pedal se lee derecho. Lo mismo vale para 'posicion'.",
+    "sinLectura": "Si no podes determinar algo con certeza, poner null y explicarlo en 'nota'. Un null honesto vale mas que un numero dudoso: es exactamente el comportamiento que se le va a exigir al modelo, y sin nulls en el ground truth no hay forma de medir si el modelo se abstiene cuando corresponde.",
+    "recorrido": "Una perilla de pedal no da la vuelta completa: va de las 7 (minimo) a las 5 (maximo) pasando por las 12. Si te da 6, revisar la orientacion.",
+    "escalaVerbal": "NO completar: la deriva la app (clockHourToScale en lib/clock.ts). 7='al minimo'; 8,9,10='bajo'; 11,12,1='al medio'; 2,3,4='alto'; 5='al maximo'.",
+    "formato24h": "Se acepta escribir 13-24 (formato 24h): 13 = la una, 14 = las dos, etc. Se normaliza a 1-12 antes de evaluar. Escribir como resulte comodo."
+  },
+  "fotos": [
+    {
+      "archivo": "1782832455703.jpg",
+      "archivo_en_carpeta_etiquetar": "01_1782832455703.jpg",
+      "nota": "",
+      "perillas": [
+        {
+          "posicion": "Arriba izquierda",
+          "etiquetaImpresa": "DRY",
+          "horaReloj": 1
+        },
+        {
+          "posicion": "Arriba derecha",
+          "etiquetaImpresa": "UP",
+          "horaReloj": 1
+        },
+        {
+          "posicion": "Abajo izquierda",
+          "etiquetaImpresa": "SUB",
+          "horaReloj": 7
+        },
+        {
+          "posicion": "Abajo derecha",
+          "etiquetaImpresa": "SUB 2",
+          "horaReloj": 2
+        }
+      ]
+    },
+    {
+      "archivo": "1782833978298.jpg",
+      "archivo_en_carpeta_etiquetar": "03_1782833978298.jpg",
+      "nota": "",
+      "perillas": [
+        {
+          "posicion": "Arriba izquierda",
+          "etiquetaImpresa": "DRY",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Arriba derecha",
+          "etiquetaImpresa": "UP",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo izquierda",
+          "etiquetaImpresa": "SUB",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo derecha",
+          "etiquetaImpresa": "SUB 2",
+          "horaReloj": null
+        }
+      ]
+    },
+    {
+      "archivo": "1782834055898.jpg",
+      "archivo_en_carpeta_etiquetar": "04_1782834055898.jpg",
+      "nota": "",
+      "perillas": [
+        {
+          "posicion": "Arriba izquierda",
+          "etiquetaImpresa": "DRY",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Arriba derecha",
+          "etiquetaImpresa": "UP",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo izquierda",
+          "etiquetaImpresa": "SUB",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo derecha",
+          "etiquetaImpresa": "SUB 2",
+          "horaReloj": null
+        }
+      ]
+    },
+    {
+      "archivo": "1782834147124.jpg",
+      "archivo_en_carpeta_etiquetar": "05_1782834147124.jpg",
+      "nota": "",
+      "perillas": [
+        {
+          "posicion": "Arriba izquierda",
+          "etiquetaImpresa": "DRY",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Arriba derecha",
+          "etiquetaImpresa": "UP",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo izquierda",
+          "etiquetaImpresa": "SUB",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo derecha",
+          "etiquetaImpresa": "SUB 2",
+          "horaReloj": null
+        }
+      ]
+    },
+    {
+      "archivo": "1782835433562.jpg",
+      "archivo_en_carpeta_etiquetar": "06_1782835433562.jpg",
+      "nota": "",
+      "perillas": [
+        {
+          "posicion": "Arriba izquierda",
+          "etiquetaImpresa": "DRY",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Arriba derecha",
+          "etiquetaImpresa": "UP",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo izquierda",
+          "etiquetaImpresa": "SUB",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo derecha",
+          "etiquetaImpresa": "SUB 2",
+          "horaReloj": null
+        }
+      ]
+    },
+    {
+      "archivo": "1782835490502.jpg",
+      "archivo_en_carpeta_etiquetar": "07_1782835490502.jpg",
+      "nota": "",
+      "perillas": [
+        {
+          "posicion": "Arriba izquierda",
+          "etiquetaImpresa": "DRY",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Arriba derecha",
+          "etiquetaImpresa": "UP",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo izquierda",
+          "etiquetaImpresa": "SUB",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo derecha",
+          "etiquetaImpresa": "SUB 2",
+          "horaReloj": null
+        }
+      ]
+    },
+    {
+      "archivo": "1782836221541.jpg",
+      "archivo_en_carpeta_etiquetar": "08_1782836221541.jpg",
+      "nota": "",
+      "perillas": [
+        {
+          "posicion": "Arriba izquierda",
+          "etiquetaImpresa": "DRY",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Arriba derecha",
+          "etiquetaImpresa": "UP",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo izquierda",
+          "etiquetaImpresa": "SUB",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo derecha",
+          "etiquetaImpresa": "SUB 2",
+          "horaReloj": null
+        }
+      ]
+    },
+    {
+      "archivo": "1782836587899.jpg",
+      "archivo_en_carpeta_etiquetar": "09_1782836587899.jpg",
+      "nota": "",
+      "perillas": [
+        {
+          "posicion": "Arriba izquierda",
+          "etiquetaImpresa": "DRY",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Arriba derecha",
+          "etiquetaImpresa": "UP",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo izquierda",
+          "etiquetaImpresa": "SUB",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo derecha",
+          "etiquetaImpresa": "SUB 2",
+          "horaReloj": null
+        }
+      ]
+    },
+    {
+      "archivo": "1782837031730.jpg",
+      "archivo_en_carpeta_etiquetar": "10_1782837031730.jpg",
+      "nota": "",
+      "perillas": [
+        {
+          "posicion": "Arriba izquierda",
+          "etiquetaImpresa": "DRY",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Arriba derecha",
+          "etiquetaImpresa": "UP",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo izquierda",
+          "etiquetaImpresa": "SUB",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo derecha",
+          "etiquetaImpresa": "SUB 2",
+          "horaReloj": null
+        }
+      ]
+    },
+    {
+      "archivo": "1782841497787.jpg",
+      "archivo_en_carpeta_etiquetar": "11_1782841497787.jpg",
+      "nota": "",
+      "perillas": [
+        {
+          "posicion": "Arriba izquierda",
+          "etiquetaImpresa": "DRY",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Arriba derecha",
+          "etiquetaImpresa": "UP",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo izquierda",
+          "etiquetaImpresa": "SUB",
+          "horaReloj": null
+        },
+        {
+          "posicion": "Abajo derecha",
+          "etiquetaImpresa": "SUB 2",
+          "horaReloj": null
+        }
+      ]
+    }
+  ],
+  "_comoCompletar_ahora": "Las 4 perillas ya estan cargadas en cada foto. Queda completar solo 'horaReloj' (null si no se puede determinar). Si en alguna foto una perilla no se ve, dejar horaReloj en null y anotarlo en 'nota' — no borrarla, porque la cantidad de perillas tambien se evalua."
+}

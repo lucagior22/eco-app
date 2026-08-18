@@ -1,6 +1,13 @@
 # Propuesta — Rediseño de la detección de perillas en `/pedal`
 
-Estado: **propuesta, sin implementar**. Fecha: 2026-07-28.
+Estado: **resuelta el 2026-08-18**. Fecha de la propuesta: 2026-07-28.
+
+> **Resolución:** se implementó la **Opción A** (reemplazo completo por un modelo multimodal), pero con **Gemini** en lugar de la API de Claude: el tier gratuito de Gemini cubre el volumen de este proyecto, que no tiene presupuesto operativo. La arquitectura descrita en la Opción A se mantuvo tal cual. Dos desvíos respecto de lo propuesto acá:
+>
+> - **La posición se reporta con una escala verbal de cinco escalones** además de la hora de reloj (la propuesta solo contemplaba la hora). Razón: la medición previa mostró que buena parte del error era de exactamente una hora, y cinco escalones sobre los ~300° de recorrido de una perilla toleran ~30° cada uno.
+> - **`scripts/detect_knobs.py` no se eliminó.** Queda en el repo como evidencia del proceso de diagnóstico, sin ser invocado y sin sus dependencias en la imagen Docker.
+>
+> El **criterio de éxito del final de este documento sigue pendiente de ejecutar** contra el pedal físico. Ver `DECISIONS.md` (2026-08-18) y `PEDAL.md`.
 
 ## Contexto y diagnóstico
 

@@ -6,3 +6,9 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+      # Detección de perillas en /pedal. Se toma del entorno del host (o de un
+      # .env junto a este archivo): nunca se escribe la clave acá.
+      # Sin ella, /pedal responde con un mensaje narrado y el resto de la app
+      # funciona normalmente.
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-}

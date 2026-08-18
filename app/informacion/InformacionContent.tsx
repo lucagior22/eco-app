@@ -82,6 +82,7 @@ const SECTIONS: readonly InfoSection[] = [
       'Usa la cámara para reconocer un pedal de efecto y describir la posición de sus perillas.',
       'Enfocá el pedal de frente, a unos veinte centímetros, con buena luz. La app va narrando indicaciones para acomodar la toma.',
       'Cuando no está segura de lo que ve, lo dice explícitamente en vez de arriesgar una respuesta equivocada. Si eso pasa, no es un error tuyo: probá cambiando la distancia, el ángulo o la iluminación.',
+      'Esta es la única pantalla que necesita conexión a internet: las fotos del pedal se envían a un servicio de análisis de imágenes de Google para poder leer las perillas. El resto de la app funciona sin conexión y sin enviar nada.',
     ],
   },
   {

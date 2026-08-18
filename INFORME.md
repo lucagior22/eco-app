@@ -340,7 +340,9 @@ Eco nació de una observación simple: la mayoría de las herramientas musicales
 
 El sistema cubre cinco funciones: afinar un instrumento con feedback hablado, leer el cifrado de acordes de una partitura, marcar el tempo con un metrónomo audible y háptico, leer la posición de las perillas de un pedal de efectos con la cámara, y personalizar la experiencia visual y auditiva. Todo operado por teclado o lector de pantalla.
 
-Está construido sobre Next.js 15, TypeScript y Tailwind CSS. Para las funciones de cámara, voz y audio se usan las APIs nativas del navegador sin librerías externas. Las dos funciones que requieren visión por computadora corren en el servidor, dentro del mismo contenedor: el OCR del cifrado con Tesseract y la detección de perillas con OpenCV, ambos invocados como procesos desde rutas de API.
+Está construido sobre Next.js 15, TypeScript y Tailwind CSS. Para las funciones de cámara, voz y audio se usan las APIs nativas del navegador sin librerías externas. Las dos funciones que requieren visión por computadora se resuelven en el servidor: el OCR del cifrado con Tesseract, invocado como proceso dentro del mismo contenedor, y la lectura de las perillas del pedal con Gemini, un modelo multimodal consultado por API.
+
+Esa segunda función es la única del sistema que envía datos fuera del dispositivo y de la infraestructura de la app, y la única que requiere conexión a internet. Es una excepción deliberada al criterio de procesamiento local que rige el resto de la app, tomada después de comprobar que la alternativa local no alcanzaba una precisión usable (§2.3).
 
 ---
 
@@ -354,7 +356,7 @@ Las cinco pantallas están implementadas y operativas. La distinción relevante 
 | Afinador (`/afinador`)             | Completo           | Detección de pitch con algoritmo YIN sobre Web Audio. Modo automático y modo cuerda por cuerda, histéresis en el umbral de afinado y narración por un canal único. |
 | Metrónomo (`/metronomo`)           | Completo           | Rango de 40 a 220 BPM, pulso por audio y por vibración, con acento en el primer tiempo del compás. Control de vibración en la propia pantalla, además del de Ajustes. |
 | Leer partitura (`/partitura`)      | Funcional, precisión irregular | OCR del cifrado de acordes con Tesseract. Devuelve acordes reales sobre lead sheets, pero confunde algunos y omite otros; el resultado se narra solo y se enuncia siempre como lectura aproximada. |
-| Detectar pedal (`/pedal`)          | Funcional, precisión parcial | Detección real de perillas por visión (OpenCV), no simulada. Vota entre 5 capturas y reporta la posición de cada perilla como hora de reloj, o declara explícitamente que no pudo leerla. |
+| Detectar pedal (`/pedal`)          | Funcional, precisión sin medir | Lectura real de perillas, no simulada, con un modelo multimodal (Gemini). Nombra cada perilla por su etiqueta impresa cuando la lee, reporta la posición en una escala verbal de cinco escalones con la hora de reloj como detalle, o declara explícitamente que no pudo leerla. Reemplazó al detector OpenCV local, cuyo techo medido no resultaba usable. |
 
 ---
 
@@ -380,7 +382,21 @@ La razón de ese diseño es de accesibilidad antes que de precisión: **un usuar
 
 Por el mismo criterio se cambiaron las etiquetas. Antes eran índices ("Perilla 1", "Perilla 2"); como la cantidad detectada variaba entre fotos, "Perilla 2" pasaba a referirse a otra perilla física sin que el usuario tuviera forma de notarlo. Ahora se nombra la posición en el panel ("Arriba izquierda"), que sí es una identidad estable.
 
-Queda abierto un sesgo sistemático por perspectiva: la cara superior de la perilla se ve como una elipse y no como un círculo, lo que corre el ángulo medido. La votación no lo corrige porque no es ruido aleatorio. Corregirlo exigiría estimar el plano del pedal y rectificar la perspectiva.
+Quedaba abierto un sesgo sistemático por perspectiva: la cara superior de la perilla se ve como una elipse y no como un círculo, lo que corre el ángulo medido. La votación no lo corrige porque no es ruido aleatorio. Corregirlo exigiría estimar el plano del pedal y rectificar la perspectiva.
+
+**El límite del enfoque local y el cambio a un modelo multimodal.** Ese sesgo, junto con dos limitaciones del mismo orden —umbrales calibrados contra un único modelo de pedal, y una cuantización a doce horas donde un error de 15° cambia la respuesta— resultó ser estructural y no de calibración. Tres rondas de arreglos medidos movieron la consistencia del 59 % al 67 %: retorno decreciente sobre un piso que igual no alcanzaba. En uso real la pantalla seguía comportándose de manera inconsistente incluso con encuadre y luz buenos.
+
+Se documentaron cuatro caminos posibles —modelo multimodal por API, híbrido con fallback local, rectificación de perspectiva, y entrenar un modelo propio— con costos, riesgos y una evaluación del hardware disponible. Se eligió el primero, con **Gemini** en su tier gratuito. La decisión trae tres consecuencias que vale la pena registrar como resultado del proceso:
+
+La primera es que **el modelo lee la serigrafía del panel**, y eso cambia la calidad de la respuesta más que la precisión: "Tone al medio" es información distinta de "Arriba izquierda a las tres" para quien no ve el pedal. La perilla pasa a llamarse como el fabricante la llamó, no como el algoritmo la ubicó. Ningún ajuste del pipeline de visión clásica podía dar eso.
+
+La segunda es que **la abstención explícita, lejos de volverse innecesaria, se volvió más difícil de sostener**. El detector anterior se abstenía por construcción: si las capturas no coincidían, no había moda que reportar. Un modelo de lenguaje no se abstiene solo — ante una foto borrosa produce un número con total aplomo. Sostener el principio exigió instrumentarlo explícitamente: un campo de confianza obligatorio en el esquema de respuesta, un prompt que declara que el usuario no puede verificar lo que se le dice, y una capa en el servidor que convierte toda confianza baja en "no pude leerla con confianza" antes de que llegue a la interfaz. El principio que el proyecto había derivado de la accesibilidad terminó siendo un requisito de diseño de la interacción con el modelo.
+
+La tercera es un **costo real y no un detalle de implementación**: las fotos del pedal salen del dispositivo hacia un servicio de terceros, y sin conexión la pantalla no funciona. La app lo declara explícitamente en su pantalla de información y en su documentación, en lugar de dejarlo implícito. Las funciones críticas en vivo —afinador y metrónomo— siguen siendo enteramente locales, que era la condición para aceptar el intercambio.
+
+Queda pendiente lo más importante: **la precisión de la nueva lectura todavía no está medida** contra el pedal físico. Leer hacia dónde apunta una marca es una debilidad conocida de los modelos de visión, análoga a leer un reloj analógico, así que superar el 68 % anterior es una expectativa razonable y no un hecho verificado. El conjunto de 92 fotografías y el criterio de éxito ya están definidos para hacerlo.
+
+Un cambio de diseño acompañó la migración y es independiente del modelo elegido: la posición dejó de reportarse solo como hora de reloj y pasó a expresarse con una **escala verbal de cinco escalones** —al mínimo, bajo, al medio, alto, al máximo—, con la hora entre paréntesis. La razón sale de la propia medición: con tolerancia de ±1 hora la consistencia saltaba del 67 % al 85 %, lo que indica que buena parte del error era de exactamente una hora. Como una perilla de pedal recorre unos 300° y no la vuelta completa, cinco escalones toleran unos 30° cada uno: el doble del error que bastaba para cambiar la hora reportada. Es además el mismo recurso que el afinador ya usaba para expresar la desviación, y la forma en que un músico describe una perilla hablando.
 
 ---
 
