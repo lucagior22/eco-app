@@ -136,6 +136,7 @@ Este proyecto es un TFI académico. La documentación sirve de evidencia del pro
 | `claude-docs/EVAL-AFINADOR.md` | Evaluación heurística crítica de `/afinador`: hallazgos de accesibilidad y diseño/UX priorizados con evidencia archivo:línea. |
 | `claude-docs/PEDAL.md` | Funcionamiento técnico de `/pedal`: pipeline de visión, arreglos medidos del detector, votación entre capturas y limitaciones. |
 | `claude-docs/OCR-PARTITURA.md` | Funcionamiento técnico de `/api/ocr`: por qué Tesseract y no oemer, pipeline, whitelist de cifrado y capas de filtrado. |
+| `claude-docs/PROPUESTA-DETECCION-PEDAL.md` | Propuesta (sin implementar) de rediseño de la detección de perillas de `/pedal`: cuatro opciones comparadas con costos, riesgos y recomendación. |
 
 ### Carpeta `claude-docs/`
 
